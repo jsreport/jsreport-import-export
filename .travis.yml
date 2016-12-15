@@ -7,5 +7,12 @@ services:
   - mongodb
   - postgresql
 
+addons:
+  apt:
+    sources:
+    - mongodb-3.0-precise
+    packages:
+    - mongodb-org-server
+
 before_script:
   - psql -c 'create database jsreport;' -U postgres
