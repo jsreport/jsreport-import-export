@@ -34,9 +34,20 @@ export default class ImportModal extends Component {
   }
 
   async import () {
-    await Studio.api.post('api/import', {
-      attach: { filename: 'import.zip', file: this.file }
-    })
+    try {
+      this.setState({
+        status: 1,
+        log: 'Working on import....'
+      })
+      await Studio.api.post('api/import', {
+        attach: { filename: 'import.zip', file: this.file }
+      })
+    } catch (e) {
+      return this.setState({
+        status: 1,
+        log: e.message + ' ' + e.stack
+      })
+    }
 
     confirm('Import successfull. We need to reload the studio.')
     location.reload()
