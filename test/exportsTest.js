@@ -1,9 +1,13 @@
 process.env.DEBUG = 'jsreport'
 require('should')
+var request = require('supertest')
 var Reporter = require('jsreport-core')
+var fs = require('fs')
+var Promise = require('bluebird')
+var path = require('path')
 
 var mongo = { connectionString: { name: 'mongodb', databaseName: 'test', address: '127.0.0.1' } }
-var fs = { connectionString: { name: 'fs' } }
+var fsStore = { connectionString: { name: 'fs' } }
 var postgres = {
   connectionString: {
     'name': 'postgres',
@@ -15,6 +19,46 @@ var postgres = {
   }
 }
 
+describe('rest api', function () {
+  var reporter
+
+  beforeEach(function () {
+    reporter = new Reporter()
+        .use(require('jsreport-templates')())
+        .use(require('jsreport-express')())
+        .use(require('../')())
+
+    return reporter.init()
+  })
+
+  it('/api/export and /api/import should get store to the original state', function () {
+    var importPath = path.join(reporter.options.tempDirectory, 'myImport.zip')
+
+    // insert a fake template
+    return reporter.documentStore.collection('templates').insert({ content: 'foo' }).then(function () {
+      // export store to myImport.zip
+      return new Promise(function (resolve) {
+        var exportStream = request(reporter.express.app).post('/api/export')
+        exportStream.pipe(fs.createWriteStream(importPath)).on('finish', resolve)
+      }).then(function () {
+        // clean up all templates in store
+        return reporter.documentStore.collection('templates').remove({})
+      }).then(function () {
+        // import myImport.zip back
+        return request(reporter.express.app)
+            .post('/api/import')
+            .attach('import.zip', importPath)
+            .expect(200)
+      })
+    }).then(function () {
+      // check if the template is back
+      return reporter.documentStore.collection('templates').find({}).then(function (res) {
+        res.should.have.length(1)
+      })
+    })
+  })
+})
+
 describe('exports', function () {
   var reporter
 
@@ -23,7 +67,7 @@ describe('exports', function () {
   })
 
   describe('fs store', function () {
-    common(fs)
+    common(fsStore)
   })
 
   describe('mongodb store', function () {
@@ -126,19 +170,19 @@ describe('exports', function () {
 
 describe('exports across stores', function () {
   describe('from fs to mongo', function () {
-    test(fs, mongo)
+    test(fsStore, mongo)
   })
 
   describe('from mongo to fs', function () {
-    test(mongo, fs)
+    test(mongo, fsStore)
   })
 
   describe('from fs to postgres', function () {
-    test(fs, postgres)
+    test(fsStore, postgres)
   })
 
   describe('from postgres to fs', function () {
-    test(postgres, fs)
+    test(postgres, fsStore)
   })
 
   describe('from mongo to postgres', function () {
