@@ -24,9 +24,9 @@ describe('rest api', function () {
 
   beforeEach(function () {
     reporter = new Reporter()
+        .use(require('../')())
         .use(require('jsreport-templates')())
         .use(require('jsreport-express')())
-        .use(require('../')())
 
     return reporter.init()
   })
@@ -56,6 +56,21 @@ describe('rest api', function () {
         res.should.have.length(1)
       })
     })
+  })
+
+  it('should return meaningfull message when import.zip missing', function (done) {
+    request(reporter.express.app)
+      .post('/api/import')
+      .attach('wrong.zip', path.join(__dirname, 'exportsTest.js'))
+      .expect(500, /import\.zip/)
+      .end(done)
+  })
+
+  it('should return meaningfull message when there is no multipart part', function (done) {
+    request(reporter.express.app)
+      .post('/api/import')
+      .expect(500, /import\.zip/)
+      .end(done)
   })
 })
 
