@@ -7,10 +7,10 @@
 
 See http://jsreport.net/learn/import-export
 
-##Installation
+## Installation
 > npm install jsreport-import-export --production
 
-##jsreport-core
+## jsreport-core
 You can apply this extension also manually to [jsreport-core](https://github.com/jsreport/jsreport-core)
 
 ```js
