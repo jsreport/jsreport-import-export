@@ -94,4 +94,3 @@ export default class ImportModal extends Component {
     </div>
   }
 }
-

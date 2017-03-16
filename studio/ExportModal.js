@@ -3,7 +3,6 @@ import Studio, { EntityTree } from 'jsreport-studio'
 import fileSaver from 'filesaver.js-npm'
 
 export default class ExportModal extends Component {
-
   componentWillMount () {
     let selections = {}
 
@@ -63,4 +62,3 @@ export default class ExportModal extends Component {
     </div>
   }
 }
-
