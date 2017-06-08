@@ -1,6 +1,6 @@
 {
   "name": "jsreport-import-export",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "jsreport extension adding templates exporting and importing API",
   "scripts": {
     "test": "mocha test --timeout 5000 && standard",
