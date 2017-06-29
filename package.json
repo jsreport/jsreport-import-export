@@ -6,6 +6,7 @@
     "test": "mocha test --timeout 5000 && standard",
     "test:watch": "mocha test --watch",
     "build": "jsreport-studio-build",
+    "prepublishOnly": "jsreport-studio-build",
     "prepublish": "in-publish && jsreport-studio-build || not-in-publish"
   },
   "homepage": "https://github.com/jsreport/jsreport-import-export",
@@ -33,6 +34,7 @@
     "archiver": "1.3.0",
     "bluebird": "3.5.0",
     "in-publish": "2.0.0",
+    "jsreport": "1.7.0",
     "multer": "1.3.0",
     "stream-to-array": "2.3.0",
     "unzip2": "0.2.5"
