@@ -49,7 +49,7 @@ export default class ImportModal extends Component {
       })
     }
 
-    confirm('Import successfull. We need to reload the studio.')
+    confirm('Import successful. We need to reload the studio.')
     location.reload()
   }
 
