@@ -52,7 +52,7 @@ export default class ExportModal extends Component {
           selectable
           onNodeSelect={(es, v) => this.handleNodeSelect(references, es, v)}
           onSelect={(e, v) => this.setState({ [e._id]: !this.state[e._id] })}
-          />
+        />
       </div>
       <div className='button-bar'>
         <a className='button confirmation' onClick={() => this.download()}>
