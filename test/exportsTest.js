@@ -21,6 +21,22 @@ var postgres = {
 }
 */
 
+function saveExportStream (reporter, stream) {
+  return new Promise(function (resolve, reject) {
+    const exportPath = path.join(reporter.options.tempDirectory, 'myExport.zip')
+    const exportDist = fs.createWriteStream(exportPath)
+
+    stream.on('error', reject)
+    exportDist.on('error', reject)
+
+    exportDist.on('finish', function () {
+      resolve(exportPath)
+    })
+
+    stream.pipe(exportDist)
+  })
+}
+
 describe('rest api', () => {
   let reporter
 
@@ -109,14 +125,16 @@ describe('exports', () => {
 
     it('should be able to export import on empty db', async () => {
       const stream = await reporter.export()
-      return reporter.import(stream)
+      const exportPath = await saveExportStream(reporter, stream)
+      return reporter.import(exportPath)
     })
 
     it('should import back deleted entity', async () => {
       await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
       const stream = await reporter.export()
+      const exportPath = await saveExportStream(reporter, stream)
       await reporter.documentStore.collection('templates').remove({})
-      await reporter.import(stream)
+      await reporter.import(exportPath)
       const res = await reporter.documentStore.collection('templates').find({})
       res.should.have.length(1)
       res[0].name.should.be.eql('foo')
@@ -125,8 +143,9 @@ describe('exports', () => {
     it('should update entity in import', async () => {
       await reporter.documentStore.collection('templates').insert({ name: 'foo', content: 'x', engine: 'none', recipe: 'html' })
       const stream = await reporter.export()
+      const exportPath = await saveExportStream(reporter, stream)
       await reporter.documentStore.collection('templates').update({}, { $set: { content: 'y' } })
-      await reporter.import(stream)
+      await reporter.import(exportPath)
       const res = await reporter.documentStore.collection('templates').find({})
       res.should.have.length(1)
       res[0].name.should.be.eql('foo')
@@ -137,9 +156,10 @@ describe('exports', () => {
       const e = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
       const e2 = await reporter.documentStore.collection('templates').insert({ name: 'foo2', engine: 'none', recipe: 'html' })
       const stream = await reporter.export([e2._id.toString()])
+      const exportPath = await saveExportStream(reporter, stream)
       await reporter.documentStore.collection('templates').remove({ _id: e._id })
       await reporter.documentStore.collection('templates').remove({ _id: e2._id })
-      await reporter.import(stream)
+      await reporter.import(exportPath)
       const res = await reporter.documentStore.collection('templates').find({})
       res.should.have.length(1)
       res[0].name.should.be.eql('foo2')
@@ -148,8 +168,9 @@ describe('exports', () => {
     it('should handle buffers', async () => {
       await reporter.documentStore.collection('assets').insert({ name: 'foo', content: 'foo' })
       const stream = await reporter.export()
+      const exportPath = await saveExportStream(reporter, stream)
       await reporter.documentStore.collection('assets').remove({})
-      await reporter.import(stream)
+      await reporter.import(exportPath)
       const res = await reporter.documentStore.collection('assets').find({})
       res.should.have.length(1)
       res[0].content.toString().should.be.eql('foo')
@@ -218,7 +239,9 @@ describe('exports across stores', function () {
     it('should export import', function () {
       return reporter1.documentStore.collection('templates').insert({ name: 'foo' }).then(function () {
         return reporter1.export().then(function (stream) {
-          return reporter2.import(stream)
+          return saveExportStream(reporter, stream).then(function (exportPath) {
+            return reporter2.import(exportPath)
+          })
         }).then(function () {
           return reporter2.documentStore.collection('templates').find({}).then(function (res) {
             res.should.have.length(1)
