@@ -19,6 +19,22 @@ var postgres = {
   }
 }
 
+function saveExportStream (reporter, stream) {
+  return new Promise(function (resolve, reject) {
+    var exportPath = path.join(reporter.options.tempDirectory, 'myExport.zip')
+    var exportDist = fs.createWriteStream(exportPath)
+
+    stream.on('error', reject)
+    exportDist.on('error', reject)
+
+    exportDist.on('finish', function () {
+      resolve(exportPath)
+    })
+
+    stream.pipe(exportDist)
+  })
+}
+
 describe('rest api', function () {
   var reporter
 
@@ -112,7 +128,9 @@ describe('exports', function () {
 
     it('should be able to export import on empty db', function () {
       return reporter.export().then(function (stream) {
-        return reporter.import(stream)
+        return saveExportStream(reporter, stream).then(function (exportPath) {
+          return reporter.import(exportPath)
+        })
       })
     })
 
@@ -120,7 +138,9 @@ describe('exports', function () {
       return reporter.documentStore.collection('templates').insert({ name: 'foo' }).then(function () {
         return reporter.export().then(function (stream) {
           return reporter.documentStore.collection('templates').remove({}).then(function () {
-            return reporter.import(stream)
+            return saveExportStream(reporter, stream).then(function (exportPath) {
+              return reporter.import(exportPath)
+            })
           }).then(function () {
             return reporter.documentStore.collection('templates').find({}).then(function (res) {
               res.should.have.length(1)
@@ -135,7 +155,9 @@ describe('exports', function () {
       return reporter.documentStore.collection('templates').insert({ name: 'foo', content: 'x' }).then(function () {
         return reporter.export().then(function (stream) {
           return reporter.documentStore.collection('templates').update({}, { $set: { content: 'y' } }).then(function () {
-            return reporter.import(stream)
+            return saveExportStream(reporter, stream).then(function (exportPath) {
+              return reporter.import(exportPath)
+            })
           }).then(function () {
             return reporter.documentStore.collection('templates').find({}).then(function (res) {
               res.should.have.length(1)
@@ -153,7 +175,9 @@ describe('exports', function () {
           return reporter.export([e2._id.toString()]).then(function (stream) {
             return reporter.documentStore.collection('templates').remove({ _id: e._id }).then(function () {
               return reporter.documentStore.collection('templates').remove({ _id: e2._id }).then(function () {
-                return reporter.import(stream)
+                return saveExportStream(reporter, stream).then(function (exportPath) {
+                  return reporter.import(exportPath)
+                })
               })
             }).then(function () {
               return reporter.documentStore.collection('templates').find({}).then(function (res) {
@@ -170,7 +194,9 @@ describe('exports', function () {
       return reporter.documentStore.collection('images').insert({ name: 'foo', content: 'foo' }).then(function () {
         return reporter.export().then(function (stream) {
           return reporter.documentStore.collection('images').remove({}).then(function () {
-            return reporter.import(stream)
+            return saveExportStream(reporter, stream).then(function (exportPath) {
+              return reporter.import(exportPath)
+            })
           }).then(function () {
             return reporter.documentStore.collection('images').find({}).then(function (res) {
               res.should.have.length(1)
@@ -243,7 +269,9 @@ describe('exports across stores', function () {
     it('should export import', function () {
       return reporter1.documentStore.collection('templates').insert({ name: 'foo' }).then(function () {
         return reporter1.export().then(function (stream) {
-          return reporter2.import(stream)
+          return saveExportStream(reporter2, stream).then(function (exportPath) {
+            return reporter2.import(exportPath)
+          })
         }).then(function () {
           return reporter2.documentStore.collection('templates').find({}).then(function (res) {
             res.should.have.length(1)
