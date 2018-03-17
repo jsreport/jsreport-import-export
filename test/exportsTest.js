@@ -53,7 +53,7 @@ describe('rest api', () => {
     const importPath = path.join(reporter.options.tempDirectory, 'myImport.zip')
 
     // insert a fake template
-    await reporter.documentStore.collection('templates').insert({ content: 'foo', engine: 'none', recipe: 'html' })
+    await reporter.documentStore.collection('templates').insert({ content: 'foo', name: 'foo', engine: 'none', recipe: 'html' })
 
     // export store to myImport.zip
     await new Promise((resolve) => {
@@ -111,15 +111,19 @@ describe('exports', () => {
 
   function common (options = {}, cfg = () => {}) {
     beforeEach(async () => {
-      reporter = jsreport(options)
-        .use(require('jsreport-templates')())
-        .use(require('jsreport-assets')())
-        .use(require('../')())
-
-      cfg(reporter)
+      const createReporter = () => {
+        const res = jsreport(options)
+          .use(require('jsreport-templates')())
+          .use(require('jsreport-assets')())
+          .use(require('../')())
+        cfg(res)
+        return res
+      }
+      reporter = createReporter()
 
       await reporter.init()
       await reporter.documentStore.drop()
+      reporter = createReporter()
       await reporter.init()
     })
 
