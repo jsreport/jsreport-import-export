@@ -49,6 +49,12 @@ describe('rest api', () => {
     return reporter.init()
   })
 
+  afterEach(async () => {
+    if (reporter) {
+      await reporter.close()
+    }
+  })
+
   it('/api/export and /api/import should get store to the original state', async () => {
     const importPath = path.join(reporter.options.tempDirectory, 'myImport.zip')
 
