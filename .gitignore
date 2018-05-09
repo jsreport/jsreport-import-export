@@ -37,8 +37,8 @@ jspm_packages
 .node_repl_history
 
 .idea
-# temporary include
-# studio/main.js
+
+studio/main.js
 studio/main.js.map
 
 data
