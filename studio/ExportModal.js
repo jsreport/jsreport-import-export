@@ -15,9 +15,16 @@ export default class ExportModal extends Component {
 
   handleNodeSelect (references, es, v) {
     let updates = {}
-    references[es].forEach((e) => {
-      updates[e._id] = v
-    })
+
+    if (Array.isArray(es)) {
+      es.forEach((_id) => {
+        updates[_id] = v
+      })
+    } else {
+      references[es].forEach((e) => {
+        updates[e._id] = v
+      })
+    }
 
     this.setState(updates)
   }
