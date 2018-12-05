@@ -123,6 +123,7 @@ describe('exports', () => {
       const createReporter = () => {
         const res = jsreport(options)
           .use(require('jsreport-templates')())
+          .use(require('jsreport-data')())
           .use(require('jsreport-assets')())
           .use(require('../')())
         cfg(res)
@@ -252,6 +253,23 @@ describe('exports', () => {
       const res = await reporter.documentStore.collection('assets').find({})
       res.should.have.length(1)
       res[0].content.toString().should.be.eql('foo')
+    })
+
+    it('should be able to import legacy export', async () => {
+      const exportPath = path.join(__dirname, 'legacy-export.zip')
+      await reporter.import(exportPath)
+      const folderRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+      const dataRes = await reporter.documentStore.collection('data').find({})
+
+      templatesRes.should.have.length(2)
+      dataRes.should.have.length(1)
+
+      folderRes.should.matchAny((e) => { e.should.have.properties({ name: 'templates' }) })
+      folderRes.should.matchAny((e) => { e.should.have.properties({ name: 'data' }) })
+      templatesRes.should.matchAny((e) => { e.should.have.properties({ name: 'foo' }) })
+      templatesRes.should.matchAny((e) => { e.should.have.properties({ name: 'bar' }) })
+      dataRes.should.matchAny((e) => { e.should.have.properties({ name: 'foo-data' }) })
     })
   }
 })

@@ -47,6 +47,7 @@
     "in-publish": "2.0.0",
     "jsreport-assets": "1.0.2",
     "jsreport-core": "github:jsreport/jsreport-core",
+    "jsreport-data": "2.0.1",
     "jsreport-express": "2.2.2",
     "jsreport-fs-store": "github:jsreport/jsreport-fs-store",
     "jsreport-mongodb-store": "1.1.1",
