@@ -5,12 +5,12 @@ const jsreport = require('jsreport-core')
 const fs = require('fs')
 const Promise = require('bluebird')
 const path = require('path')
+const { unzipEntities } = require('../lib/helpers')
 
 const mongo = { store: { provider: 'mongodb' }, extensions: { 'mongodb-store': { databaseName: 'test', address: '127.0.0.1' } } }
 const fsStore = { store: { provider: 'fs' } }
 
-/*
-var postgres = {
+const postgres = {
   store: {
     provider: 'postgres'
   },
@@ -24,7 +24,6 @@ var postgres = {
     }
   }
 }
-*/
 
 function saveExportStream (reporter, stream) {
   return new Promise(function (resolve, reject) {
@@ -115,10 +114,9 @@ describe('exports', () => {
     common(mongo, (reporter) => reporter.use(require('jsreport-mongodb-store')()))
   })
 
-  /*  describe('postgres store', function () {
+  describe('postgres store', function () {
     common(postgres, (reporter) => reporter.use(require('jsreport-postgres-store')()))
   })
-*/
 
   function common (options = {}, cfg = () => {}) {
     beforeEach(async () => {
@@ -136,6 +134,19 @@ describe('exports', () => {
       await reporter.documentStore.drop()
       reporter = createReporter()
       await reporter.init()
+    })
+
+    it('should contain metadata.json in export', async () => {
+      const stream = await reporter.export()
+      const exportPath = await saveExportStream(reporter, stream)
+      const exportContents = await unzipEntities(exportPath)
+
+      exportContents.metadata.should.have.properties([
+        'reporterVersion',
+        'importExportVersion',
+        'storeProvider',
+        'createdAt'
+      ])
     })
 
     it('should be able to export import on empty db', async () => {
@@ -181,12 +192,20 @@ describe('exports', () => {
     })
 
     it('should be able to export import folder of entity', async () => {
-      const f = await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
+      await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
       const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
       const stream = await reporter.export([e1._id.toString()])
       const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({ _id: e1._id })
-      await reporter.documentStore.collection('folders').remove({ _id: f._id })
+      await reporter.documentStore.collection('templates').remove({})
+
+      // doing this because reporter.documentStore.collection('folders').remove({}) does not
+      // delete all entities with mongodb store
+      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
+        return reporter.documentStore.collection('folders').remove({
+          _id: e._id
+        })
+      }))
+
       await reporter.import(exportPath)
       const foldersRes = await reporter.documentStore.collection('folders').find({})
       const templatesRes = await reporter.documentStore.collection('templates').find({})
@@ -197,16 +216,22 @@ describe('exports', () => {
     })
 
     it('should be able to export import parent folders of entity', async () => {
-      const f = await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
-      const f2 = await reporter.documentStore.collection('folders').insert({ name: 'level2', shortid: 'level2', folder: { shortid: 'level1' } })
-      const f3 = await reporter.documentStore.collection('folders').insert({ name: 'level3', shortid: 'level3', folder: { shortid: 'level2' } })
-      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
+      await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
+      await reporter.documentStore.collection('folders').insert({ name: 'level2', shortid: 'level2', folder: { shortid: 'level1' } })
+      await reporter.documentStore.collection('folders').insert({ name: 'level3', shortid: 'level3', folder: { shortid: 'level2' } })
+      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level3' } })
       const stream = await reporter.export([e1._id.toString()])
       const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({ _id: e1._id })
-      await reporter.documentStore.collection('folders').remove({ _id: f3._id })
-      await reporter.documentStore.collection('folders').remove({ _id: f2._id })
-      await reporter.documentStore.collection('folders').remove({ _id: f._id })
+      await reporter.documentStore.collection('templates').remove({})
+
+      // doing this because reporter.documentStore.collection('folders').remove({}) does not
+      // delete all entities with mongodb store
+      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
+        return reporter.documentStore.collection('folders').remove({
+          _id: e._id
+        })
+      }))
+
       await reporter.import(exportPath)
       const foldersRes = await reporter.documentStore.collection('folders').find({})
       const templatesRes = await reporter.documentStore.collection('templates').find({})
