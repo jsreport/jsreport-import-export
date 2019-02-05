@@ -36,7 +36,7 @@ export default class ExportModal extends Component {
           selection: Object.keys(this.state).filter((k) => this.state[k])
         },
         responseType: 'blob'
-      })
+      }, true)
 
       fileSaver.saveAs(response, 'export.zip')
     } catch (e) {

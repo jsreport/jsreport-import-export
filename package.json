@@ -3,6 +3,7 @@
   "version": "1.1.2",
   "description": "jsreport extension adding templates exporting and importing API",
   "scripts": {
+    "start": "jsreport-studio-start --httpPort 5488",
     "test": "mocha test --timeout 5000 --exit && standard",
     "test:watch": "mocha test --watch",
     "build": "jsreport-studio-build",

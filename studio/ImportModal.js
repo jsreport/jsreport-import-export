@@ -7,6 +7,11 @@ export default class ImportModal extends Component {
       return
     }
 
+    this.setState({
+      status: '1',
+      log: 'Validating import....'
+    })
+
     this.file = e.target.files[0]
     const reader = new FileReader()
 
@@ -16,11 +21,11 @@ export default class ImportModal extends Component {
       try {
         const result = await Studio.api.post('api/validate-import', {
           attach: { filename: 'import.zip', file: this.file }
-        })
+        }, true)
         this.setState(result)
       } catch (e) {
         this.setState({
-          status: 1,
+          status: '1',
           log: e.message + ' ' + e.stack
         })
       }
@@ -36,17 +41,19 @@ export default class ImportModal extends Component {
   async import () {
     try {
       this.setState({
-        status: 1,
+        status: '1',
         log: 'Working on import....'
       })
       await Studio.api.post('api/import', {
         attach: { filename: 'import.zip', file: this.file }
-      })
+      }, true)
     } catch (e) {
-      return this.setState({
-        status: 1,
+      this.setState({
+        status: '1',
         log: e.message + ' ' + e.stack
       })
+
+      return
     }
 
     confirm('Import successful. We need to reload the studio.')
@@ -85,11 +92,13 @@ export default class ImportModal extends Component {
           <textarea style={{width: '100%', boxSizing: 'border-box'}} rows='10' readOnly value={this.state.log} />
         </div>
 
-        <div className='button-bar'>
-          <a className='button confirmation' onClick={() => this.import()}>
-            Import
-          </a>
-        </div>
+        {this.state.status === '0' && (
+          <div className='button-bar'>
+            <a className='button confirmation' onClick={() => this.import()}>
+              Import
+            </a>
+          </div>
+        )}
       </div> : <div />}
     </div>
   }
