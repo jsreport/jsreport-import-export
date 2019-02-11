@@ -137,6 +137,12 @@ describe('exports', () => {
       await reporter.init()
     })
 
+    afterEach(async () => {
+      if (reporter) {
+        await reporter.close()
+      }
+    })
+
     it('should contain metadata.json in export', async () => {
       const stream = await reporter.export()
       const exportPath = await saveExportStream(reporter, stream)
@@ -270,6 +276,55 @@ describe('exports', () => {
       templatesRes.should.matchAny((e) => { e.should.have.properties({ name: 'foo' }) })
       templatesRes.should.matchAny((e) => { e.should.have.properties({ name: 'bar' }) })
       dataRes.should.matchAny((e) => { e.should.have.properties({ name: 'foo-data' }) })
+    })
+
+    it('should be able to import into target folder', async () => {
+      await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
+      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
+      const stream = await reporter.export([e1._id.toString()])
+      const exportPath = await saveExportStream(reporter, stream)
+      await reporter.documentStore.collection('templates').remove({})
+
+      // doing this because reporter.documentStore.collection('folders').remove({}) does not
+      // delete all entities with mongodb store
+      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
+        return reporter.documentStore.collection('folders').remove({
+          _id: e._id
+        })
+      }))
+
+      const targetFolder = await reporter.documentStore.collection('folders').insert({ name: 'target', shortid: 'target' })
+
+      await reporter.import(exportPath, {
+        targetFolder: targetFolder.shortid
+      })
+
+      const foldersRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+      foldersRes.should.have.length(2)
+      templatesRes.should.have.length(1)
+      foldersRes.find((f) => f.folder && f.folder.shortid === 'target').name.should.be.eql('level1')
+    })
+
+    it('should throw error when import into target folder finds duplicate entity', async () => {
+      await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
+      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
+      const stream = await reporter.export([e1._id.toString()])
+      const exportPath = await saveExportStream(reporter, stream)
+
+      const targetFolder = await reporter.documentStore.collection('folders').insert({ name: 'target', shortid: 'target' })
+
+      await reporter.import(exportPath, {
+        targetFolder: targetFolder.shortid
+      })
+
+      const foldersRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+      foldersRes.should.have.length(2)
+      templatesRes.should.have.length(1)
+      const found = foldersRes.find((f) => f.folder && f.folder.shortid === 'target') != null
+
+      found.should.be.eql(false)
     })
   }
 })

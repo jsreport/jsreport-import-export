@@ -1,7 +1,59 @@
 import React, {Component} from 'react'
 import Studio from 'jsreport-studio'
 
+const EntityRefSelect = Studio.EntityRefSelect
+
+class ImportFinishedModal extends Component {
+  componentDidMount () {
+    setTimeout(() => this.confirmBtn.focus(), 0)
+  }
+
+  componentWillUnmount () {
+    location.reload()
+  }
+
+  confirm () {
+    location.reload()
+    this.props.close()
+  }
+
+  render () {
+    const { log } = this.props.options
+
+    return (
+      <div>
+        <h1><i className='fa fa-info-circle' /> Import finished</h1>
+        {log != null && log !== '' && (
+          <div className='form-group'>
+            <div>
+              <i>Some errors/warnings happened during the import:</i>
+            </div>
+            <textarea style={{width: '100%', boxSizing: 'border-box'}} rows='10' readOnly value={log} />
+          </div>
+        )}
+        <div className='form-group'>
+          <i>Now we need to reload the studio..</i>
+        </div>
+        <div className='button-bar'>
+          <button ref={(el) => { this.confirmBtn = el }} className='button confirmation' onClick={() => this.confirm()}>
+            Ok
+          </button>
+        </div>
+      </div>
+    )
+  }
+}
+
 export default class ImportModal extends Component {
+  constructor (props) {
+    super(props)
+
+    this.state = {
+      selectedFolderShortid: null,
+      validated: false
+    }
+  }
+
   upload (e) {
     if (!e.target.files.length) {
       return
@@ -20,11 +72,18 @@ export default class ImportModal extends Component {
 
       try {
         const result = await Studio.api.post('api/validate-import', {
+          params: { targetFolder: this.state.selectedFolderShortid },
           attach: { filename: 'import.zip', file: this.file }
         }, true)
-        this.setState(result)
+
+        this.setState({
+          validated: true,
+          status: result.status,
+          log: result.log
+        })
       } catch (e) {
         this.setState({
+          validated: true,
           status: '1',
           log: e.message + ' ' + e.stack
         })
@@ -44,20 +103,27 @@ export default class ImportModal extends Component {
         status: '1',
         log: 'Working on import....'
       })
-      await Studio.api.post('api/import', {
+
+      const result = await Studio.api.post('api/import', {
+        params: { targetFolder: this.state.selectedFolderShortid },
         attach: { filename: 'import.zip', file: this.file }
       }, true)
+
+      Studio.openModal(ImportFinishedModal, {
+        log: result.log
+      })
     } catch (e) {
       this.setState({
         status: '1',
         log: e.message + ' ' + e.stack
       })
-
-      return
     }
+  }
 
-    confirm('Import successful. We need to reload the studio.')
-    location.reload()
+  cancel () {
+    this.setState({
+      validated: false
+    })
   }
 
   openFileDialog () {
@@ -69,38 +135,67 @@ export default class ImportModal extends Component {
   }
 
   render () {
-    return <div>
-      <input type='file' key='file' ref='file' style={{display: 'none'}} onChange={(e) => this.upload(e)} />
+    return (
+      <div>
+        <input type='file' key='file' ref='file' style={{display: 'none'}} onChange={(e) => this.upload(e)} />
 
-      <h1><i className='fa fa-upload' /> Import objects</h1>
+        <h1><i className='fa fa-upload' /> Import objects</h1>
 
-      <div className='form-group'>
-        <p>
-          You can safely upload the exported package and review the changes which will be performed. Afterwards you can
-          reject or perform the import.
-        </p>
-
-        <div className='button-bar'>
-          <a className='button confirmation' onClick={() => this.openFileDialog()}>
-            Validate
-          </a>
+        <div className='form-group'>
+          <p>
+            A <b>validation is run first</b>, so you can safely upload the exported package and review the changes which will be performed.
+            <br />
+            Afterwards <b>you can confirm or cancel the import</b>.
+          </p>
+        </div>
+        <div className='form-group'>
+          <div style={{ border: '1px dashed black', padding: '0.6rem', opacity: this.state.validated ? 0.7 : 1 }}>
+            <label>You can <b>optionally</b> select a folder in which the entities  will be inserted</label>
+            <EntityRefSelect
+              noModal
+              allowNewFolder
+              treeStyle={{ height: '12rem' }}
+              headingLabel='Select folder'
+              filter={(references) => ({ folders: references.folders })}
+              selectableFilter={(isGroup, entity) => entity.__entitySet === 'folders'}
+              value={this.state.selectedFolderShortid}
+              disabled={this.state.validated}
+              onChange={(selected) => {
+                this.setState({
+                  selectedFolderShortid: selected.length > 0 ? selected[0].shortid : null
+                })
+              }}
+            />
+          </div>
+          {!this.state.validated && (
+            <div className='button-bar'>
+              <a className='button confirmation' onClick={() => this.openFileDialog()}>
+                Validate
+              </a>
+            </div>
+          )}
+          <br />
+          {this.state.validated && (
+            <div>
+              <div>
+                <i>Log of changes with the import:</i>
+              </div>
+              <textarea style={{width: '100%', boxSizing: 'border-box'}} rows='10' readOnly value={this.state.log} />
+            </div>
+          )}
+          {this.state.validated && this.state.status === '0' && (
+            <div className='button-bar'>
+              <a className='button danger' onClick={() => this.cancel()}>
+                Cancel
+              </a>
+              <a className='button confirmation' onClick={() => this.import()}>
+                Import
+              </a>
+            </div>
+          )}
         </div>
       </div>
-
-      {this.state ? <div className='form-group'>
-        <div>
-          <textarea style={{width: '100%', boxSizing: 'border-box'}} rows='10' readOnly value={this.state.log} />
-        </div>
-
-        {this.state.status === '0' && (
-          <div className='button-bar'>
-            <a className='button confirmation' onClick={() => this.import()}>
-              Import
-            </a>
-          </div>
-        )}
-      </div> : <div />}
-    </div>
+    )
   }
 }
 

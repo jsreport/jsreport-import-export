@@ -506,6 +506,7 @@
 	                  status: '1',
 	                  log: 'Working on import....'
 	                });
+	
 	                _context2.next = 4;
 	                return _jsreportStudio2.default.api.post('api/import', {
 	                  params: { targetFolder: this.state.selectedFolderShortid },
