@@ -9,12 +9,13 @@ class ImportFinishedModal extends Component {
   }
 
   componentWillUnmount () {
-    location.reload()
+    Studio.reset().catch(() => {})
   }
 
   confirm () {
-    location.reload()
     this.props.close()
+
+    Studio.reset().catch(() => {})
   }
 
   render () {
