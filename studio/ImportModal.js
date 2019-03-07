@@ -15,7 +15,7 @@ class ImportFinishedModal extends Component {
   confirm () {
     this.props.close()
 
-    Studio.reset().catch(() => {})
+    Studio.reset().catch((e) => { console.error(e) })
   }
 
   render () {
