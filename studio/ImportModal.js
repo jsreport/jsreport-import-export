@@ -50,7 +50,7 @@ export default class ImportModal extends Component {
     super(props)
 
     this.state = {
-      selectedFolderShortid: null,
+      selectedFolderShortid: props.options != null && props.options.selectedFolderShortid ? props.options.selectedFolderShortid : null,
       validated: false
     }
   }

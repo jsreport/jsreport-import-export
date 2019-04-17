@@ -4,11 +4,26 @@ import fileSaver from 'filesaver.js-npm'
 
 export default class ExportModal extends Component {
   componentWillMount () {
+    const { options } = this.props
     let selections = {}
 
     var references = Studio.getReferences()
     Object.keys(references).forEach((k) => {
-      Object.keys(references[k]).forEach((e) => (selections[references[k][e]._id] = true))
+      Object.keys(references[k]).forEach((e) => {
+        if (options.initialSelected != null) {
+          const selected = Array.isArray(options.initialSelected) ? options.initialSelected : [options.initialSelected]
+
+          selected.forEach((s) => {
+            if (references[k][e]._id === s) {
+              selections[references[k][e]._id] = true
+            } else if (selections[references[k][e]._id] == null) {
+              selections[references[k][e]._id] = false
+            }
+          })
+        } else {
+          selections[references[k][e]._id] = true
+        }
+      })
     })
     this.setState(selections)
   }
