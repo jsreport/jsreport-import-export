@@ -306,6 +306,64 @@ describe('exports', () => {
       foldersRes.find((f) => f.folder && f.folder.shortid === 'target').name.should.be.eql('level1')
     })
 
+    it('should be able to handle full import mode', async () => {
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html' })
+      const t2 = await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html' })
+      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
+      const t3 = await reporter.documentStore.collection('templates').insert({ name: 'c', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
+      const f2 = await reporter.documentStore.collection('folders').insert({ name: 'level2', shortid: 'level2', folder: { shortid: 'level1' } })
+      const t4 = await reporter.documentStore.collection('templates').insert({ name: 'd', engine: 'none', recipe: 'html', folder: { shortid: 'level2' } })
+
+      const stream = await reporter.export([
+        f1._id.toString(),
+        f2._id.toString(),
+        t1._id.toString(),
+        t2._id.toString(),
+        t3._id.toString(),
+        t4._id.toString()
+      ])
+
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await Promise.all((await reporter.documentStore.collection('templates').find({})).map(async (e) => {
+        return reporter.documentStore.collection('templates').remove({
+          _id: e._id
+        })
+      }))
+
+      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
+        return reporter.documentStore.collection('folders').remove({
+          _id: e._id
+        })
+      }))
+
+      await reporter.documentStore.collection('templates').insert({ name: 'e', engine: 'none', recipe: 'html' })
+      await reporter.documentStore.collection('templates').insert({ name: 'f', engine: 'none', recipe: 'html' })
+      await reporter.documentStore.collection('folders').insert({ name: 'nlevel1', shortid: 'nlevel1' })
+      await reporter.documentStore.collection('templates').insert({ name: 'g', engine: 'none', recipe: 'html', folder: { shortid: 'nlevel1' } })
+
+      await reporter.import(exportPath, {
+        fullImport: true
+      })
+
+      const foldersRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+
+      foldersRes.should.have.length(2)
+      templatesRes.should.have.length(4)
+
+      const allExpectedTemplates = [t1, t2, t3, t4]
+      const allExpectedFolders = [f1, f2]
+
+      allExpectedTemplates.forEach((t) => {
+        templatesRes.should.matchAny((e) => e._id.toString().should.be.eql(t._id.toString()))
+      })
+
+      allExpectedFolders.forEach((f) => {
+        foldersRes.should.matchAny((e) => e._id.toString().should.be.eql(f._id.toString()))
+      })
+    })
+
     it('should throw error when import into target folder finds duplicate entity', async () => {
       await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
       const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
