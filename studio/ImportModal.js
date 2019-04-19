@@ -51,6 +51,7 @@ export default class ImportModal extends Component {
 
     this.state = {
       selectedFolderShortid: props.options != null && props.options.selectedFolderShortid ? props.options.selectedFolderShortid : null,
+      fullImport: false,
       validated: false
     }
   }
@@ -62,6 +63,7 @@ export default class ImportModal extends Component {
 
     this.setState({
       status: '1',
+      processing: true,
       log: 'Validating import....'
     })
 
@@ -73,19 +75,24 @@ export default class ImportModal extends Component {
 
       try {
         const result = await Studio.api.post('api/validate-import', {
-          params: { targetFolder: this.state.selectedFolderShortid },
+          params: {
+            fullImport: this.state.fullImport,
+            targetFolder: this.state.selectedFolderShortid
+          },
           attach: { filename: 'import.zip', file: this.file }
         }, true)
 
         this.setState({
           validated: true,
           status: result.status,
+          processing: false,
           log: result.log
         })
       } catch (e) {
         this.setState({
           validated: true,
           status: '1',
+          processing: false,
           log: e.message + ' ' + e.stack
         })
       }
@@ -102,11 +109,15 @@ export default class ImportModal extends Component {
     try {
       this.setState({
         status: '1',
+        processing: true,
         log: 'Working on import....'
       })
 
       const result = await Studio.api.post('api/import', {
-        params: { targetFolder: this.state.selectedFolderShortid },
+        params: {
+          fullImport: this.state.fullImport,
+          targetFolder: this.state.selectedFolderShortid
+        },
         attach: { filename: 'import.zip', file: this.file }
       }, true)
 
@@ -116,6 +127,7 @@ export default class ImportModal extends Component {
     } catch (e) {
       this.setState({
         status: '1',
+        processing: false,
         log: e.message + ' ' + e.stack
       })
     }
@@ -144,13 +156,38 @@ export default class ImportModal extends Component {
 
         <div className='form-group'>
           <p>
-            A <b>validation is run first</b>, so you can safely upload the exported package and review the changes which will be performed.
-            <br />
-            Afterwards <b>you can confirm or cancel the import</b>.
+            A <b>validation is run first</b>, so you can safely upload the exported package and review the changes which will be performed. Afterwards <b>you can confirm or cancel the import</b>.
           </p>
         </div>
         <div className='form-group'>
-          <div style={{ border: '1px dashed black', padding: '0.6rem', opacity: this.state.validated ? 0.7 : 1 }}>
+          <div>
+            <label style={{ opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1 }}>
+              <input
+                type='checkbox'
+                style={{ verticalAlign: 'middle' }}
+                disabled={this.state.processing === true || this.state.validated}
+                onChange={(e) => {
+                  this.setState({
+                    fullImport: e.target.checked
+                  })
+                }}
+              />
+              <span style={{ verticalAlign: 'middle' }}>Full Import</span>
+            </label>
+          </div>
+          {this.state.fullImport && (
+            <p style={{ marginTop: '15px' }}>
+              A <b>full import</b> means that <b>all the entities that are not present in the zip will be deleted</b>, after the import <b>you will have only the entities that were present in the zip</b>.
+            </p>
+          )}
+        </div>
+        <div className='form-group'>
+          <div style={{
+            display: !this.state.fullImport ? 'block' : 'none',
+            border: '1px dashed black',
+            padding: '0.6rem',
+            opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1
+          }}>
             <label>You can <b>optionally</b> select a folder in which the entities  will be inserted</label>
             <EntityRefSelect
               noModal
@@ -160,7 +197,7 @@ export default class ImportModal extends Component {
               filter={(references) => ({ folders: references.folders })}
               selectableFilter={(isGroup, entity) => entity.__entitySet === 'folders'}
               value={this.state.selectedFolderShortid}
-              disabled={this.state.validated}
+              disabled={this.state.processing === true || this.state.validated}
               onChange={(selected) => {
                 this.setState({
                   selectedFolderShortid: selected.length > 0 ? selected[0].shortid : null
