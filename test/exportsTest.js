@@ -1,5 +1,5 @@
 process.env.DEBUG = 'jsreport'
-require('should')
+const should = require('should')
 const request = require('supertest')
 const jsreport = require('jsreport-core')
 const fs = require('fs')
@@ -306,7 +306,94 @@ describe('exports', () => {
       foldersRes.find((f) => f.folder && f.folder.shortid === 'target').name.should.be.eql('level1')
     })
 
-    it('should be able to handle full import mode', async () => {
+    it('should be able to handle full import mode (delete extra entities)', async () => {
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html' })
+      const t2 = await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html' })
+
+      const stream = await reporter.export([
+        t1._id.toString(),
+        t2._id.toString()
+      ])
+
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await reporter.documentStore.collection('templates').insert({ name: 'c', engine: 'none', recipe: 'html' })
+
+      await reporter.import(exportPath, {
+        fullImport: true
+      })
+
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+
+      templatesRes.should.have.length(2)
+
+      const allExpectedTemplates = [t1, t2]
+
+      allExpectedTemplates.forEach((t) => {
+        templatesRes.should.matchAny((e) => e._id.toString().should.be.eql(t._id.toString()))
+      })
+    })
+
+    it('should be able to handle full import mode (entity should be restored to the state inside the zip)', async () => {
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', content: 'a', engine: 'none', recipe: 'html' })
+
+      const stream = await reporter.export([
+        t1._id.toString()
+      ])
+
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await reporter.documentStore.collection('templates').update({
+        _id: t1._id
+      }, {
+        $set: {
+          content: 'new content',
+          extraProp: 'foo'
+        }
+      })
+
+      await reporter.import(exportPath, {
+        fullImport: true
+      })
+
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+
+      templatesRes.should.have.length(1)
+
+      const importedT1 = templatesRes[0]
+
+      importedT1.content.should.be.eql('a')
+      should(importedT1.extraProp).be.undefined()
+    })
+
+    it('should be able to handle full import mode (keep folder and delete extra entities inside it)', async () => {
+      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder1', shortid: 'folder1' })
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html', folder: { shortid: 'folder1' } })
+
+      const stream = await reporter.export([
+        f1._id.toString(),
+        t1._id.toString()
+      ])
+
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html', folder: { shortid: 'folder1' } })
+
+      await reporter.import(exportPath, {
+        fullImport: true
+      })
+
+      const foldersRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+
+      foldersRes.should.have.length(1)
+      templatesRes.should.have.length(1)
+
+      foldersRes[0]._id.should.be.eql(f1._id)
+      templatesRes[0]._id.should.be.eql(t1._id)
+    })
+
+    it('should be able to handle full import mode (folders and subfolders)', async () => {
       const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html' })
       const t2 = await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html' })
       const f1 = await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
