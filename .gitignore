@@ -43,3 +43,7 @@ jspm_packages
 # studio/main.js.map
 
 data
+
+jsreport.config.json
+dev.config.json
+prod.config.json

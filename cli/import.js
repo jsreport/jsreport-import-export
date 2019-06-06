@@ -1,0 +1,425 @@
+const fs = require('fs')
+const urlModule = require('url')
+const FormData = require('form-data')
+const doRequest = require('./doRequest')
+const normalizePath = require('./normalizePath')
+
+const description = 'Import a zip with entities in the specified jsreport instance'
+const command = 'import'
+
+exports.command = command
+exports.description = description
+
+exports.configuration = {
+  globalOptions: ['serverUrl', 'user', 'password']
+}
+
+exports.builder = (yargs) => {
+  const examples = getExamples(`jsreport ${command}`)
+
+  examples.forEach((examp) => {
+    yargs.example(examp[0], examp[1])
+  })
+
+  const commandOptions = {
+    targetFolder: {
+      alias: 't',
+      description: 'The target folder shortid, the entities of the zip will be imported inside the specified folder',
+      type: 'string',
+      requiresArg: true
+    },
+    fullImport: {
+      alias: 'f',
+      description: 'Perform a full import, which means that after the import you will have only the entities that were present in the zip',
+      type: 'boolean'
+    },
+    validation: {
+      alias: 'd',
+      description: 'Perform a just a validation, the import won\'t be done and the validation messages will be returned as the output',
+      type: 'boolean'
+    }
+  }
+
+  const options = Object.keys(commandOptions)
+
+  return (
+    yargs
+      .usage(`${description}\n\n${getUsage(`jsreport ${command}`)}`)
+      .positional('zipFile', {
+        type: 'string',
+        description: 'Absolute or relative path to the zip file to import'
+      })
+      .group(options, 'Command options:')
+      .options(commandOptions)
+      .check((argv) => {
+        if (!argv || !argv._[1]) {
+          throw new Error('"zipFile" argument is required')
+        }
+
+        argv._[1] = normalizePath(argv.context.cwd, 'zipFile', argv._[1], {
+          type: 'argument',
+          read: false,
+          strict: true
+        })
+
+        if (!fs.existsSync(argv._[1])) {
+          throw new Error(`zipFile argument "${argv._[1]}" points to a file that does not exists. make sure to specify a zip file`)
+        }
+
+        if (argv.user && !argv.serverUrl) {
+          throw new Error('user option needs to be used with --serverUrl option')
+        }
+
+        if (argv.user && !argv.password) {
+          throw new Error('user option needs to be used with --password option')
+        }
+
+        if (argv.password && !argv.user) {
+          throw new Error('password option needs to be used with --user option')
+        }
+
+        if (argv.fullImport && argv.targetFolder != null) {
+          throw new Error('fullImport option can\'t be used at the same time that the --targetFolder option')
+        }
+
+        return true
+      })
+  )
+}
+
+exports.handler = async (argv) => {
+  const zipFilePath = argv._[1]
+  const context = argv.context
+  const verbose = argv.verbose
+  const options = getOptions(argv)
+
+  if (options.remote) {
+    // connect to a remote server
+    console.log(`starting${options.import && options.import.validation ? ' validation' : ''} import${
+      options.import && options.import.fullImport ? ' (full import)' : ''
+    }${
+      options.import && options.import.targetFolder ? ` (target folder: ${options.import.targetFolder})` : ''
+    } in ${argv.serverUrl}..`)
+
+    try {
+      const result = await startImport(null, {
+        verbose,
+        importOptions: options.import,
+        input: zipFilePath,
+        remote: options.remote
+      })
+
+      result.fromRemote = true
+
+      return result
+    } catch (e) {
+      return onCriticalError(e)
+    }
+  }
+
+  const cwd = context.cwd
+  const workerSockPath = context.workerSockPath
+  const getInstance = context.getInstance
+  const initInstance = context.initInstance
+  const daemonHandler = context.daemonHandler
+  const findProcessByCWD = daemonHandler.findProcessByCWD
+
+  if (verbose) {
+    console.log('looking for previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
+  }
+
+  // first, try to look up if there is an existing process
+  // "daemonized" before in the CWD
+  let processInfo
+
+  try {
+    processInfo = await findProcessByCWD(workerSockPath, cwd)
+  } catch (processLookupErr) {
+    return onCriticalError(processLookupErr)
+  }
+
+  // if process was found, just connect to it,
+  // otherwise just continue processing
+  if (processInfo) {
+    if (verbose) {
+      console.log(`using instance daemonized previously (pid: ${processInfo.pid})..`)
+    }
+
+    const adminAuthentication = processInfo.adminAuthentication || {}
+
+    try {
+      const result = await startImport(null, {
+        verbose,
+        importOptions: options.import,
+        input: zipFilePath,
+        remote: {
+          url: processInfo.url,
+          user: adminAuthentication.username,
+          password: adminAuthentication.password
+        }
+      })
+
+      result.fromDaemon = true
+
+      return result
+    } catch (e) {
+      return onCriticalError(e)
+    }
+  }
+
+  if (verbose) {
+    console.log('there is no previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
+  }
+
+  try {
+    if (verbose) {
+      console.log('trying to start an instance in cwd:', cwd)
+    }
+
+    const _instance = await getInstance(cwd)
+    let jsreportInstance
+
+    if (verbose) {
+      console.log('disabling express extension..')
+    }
+
+    if (typeof _instance === 'function') {
+      jsreportInstance = _instance()
+    } else {
+      jsreportInstance = _instance
+    }
+
+    jsreportInstance.options = jsreportInstance.options || {}
+    jsreportInstance.options.extensions = jsreportInstance.options.extensions || {}
+    jsreportInstance.options.extensions.express = Object.assign(
+      {},
+      jsreportInstance.options.extensions.express,
+      { enabled: false }
+    )
+
+    await initInstance(jsreportInstance)
+
+    console.log(`starting${options.import && options.import.validation ? ' validation' : ''} import${
+      options.import && options.import.fullImport ? ' (full import)' : ''
+    }${
+      options.import && options.import.targetFolder ? ` (target folder: ${options.import.targetFolder})` : ''
+    } in local instance..`)
+
+    return (await startImport(jsreportInstance, {
+      verbose: verbose,
+      importOptions: options.import,
+      input: zipFilePath
+    }))
+  } catch (e) {
+    return onCriticalError(e)
+  }
+
+  function onCriticalError (err) {
+    err.message = `A critical error occurred while trying to execute the ${command} command: ${err.message}`
+    throw err
+  }
+}
+
+async function startImport (jsreportInstance, { remote, importOptions, input, verbose }) {
+  let result = {}
+
+  if (verbose) {
+    if (remote) {
+      console.log('remote server options:')
+      console.log(remote)
+    }
+
+    console.log('importing with options:')
+    console.log(JSON.stringify(importOptions, null, 2))
+  }
+
+  if (remote) {
+    try {
+      const form = new FormData()
+
+      form.append('import.zip', fs.createReadStream(input))
+
+      const formHeaders = await new Promise((resolve, reject) => {
+        form.getLength((err, length) => {
+          if (err) {
+            return reject(err)
+          }
+
+          const headers = Object.assign({'Content-Length': length}, form.getHeaders())
+          resolve(headers)
+        })
+      })
+
+      const reqOpts = {
+        url: urlModule.resolve(remote.url, importOptions.validation ? 'api/validate-import' : 'api/import'),
+        method: 'POST',
+        headers: {
+          // this sets the Content-type: multipart/form-data
+          ...formHeaders
+        },
+        params: importOptions,
+        data: form
+      }
+
+      if (remote.user || remote.password) {
+        reqOpts.auth = {
+          username: remote.user,
+          password: remote.password
+        }
+      }
+
+      const response = await doRequest(reqOpts)
+
+      result.importLog = response.data.log
+
+      if (response.headers && response.headers['import-entities-count'] != null) {
+        result.entitiesCount = JSON.parse(response.headers['import-entities-count'])
+      }
+    } catch (err) {
+      let customError
+
+      if (err.code === 'ECONNREFUSED') {
+        customError = new Error(`Couldn't connect to remote jsreport server in: ${
+          remote.url
+        } , Please verify that a jsreport server is running`)
+      }
+
+      if (!customError && err.response && err.response.statusCode != null) {
+        if (err.response.statusCode === 404) {
+          customError = new Error(`Couldn't connect to remote jsreport server in: ${
+            remote.url
+          } , Please verify that a jsreport server is running`)
+        } else if (err.response.statusCode === 401) {
+          customError = new Error(`Couldn't connect to remote jsreport server in: ${
+            remote.url
+          } , Authentication error, Please pass correct --user and --password options`)
+        }
+      }
+
+      if (customError) {
+        customError.originalError = err
+        throw onImportError(customError)
+      }
+
+      throw err
+    }
+  } else {
+    try {
+      let importResult
+
+      if (importOptions.validation) {
+        importResult = await jsreportInstance.importValidation(input, importOptions)
+      } else {
+        importResult = await jsreportInstance.import(input, importOptions)
+      }
+
+      // compatibility with older versions
+      if (typeof importResult === 'string') {
+        result.importLog = importResult
+      } else {
+        result.importLog = importResult.log
+      }
+
+      if (importResult.entitiesCount != null) {
+        result.entitiesCount = importResult.entitiesCount
+      }
+    } catch (err) {
+      throw onImportError(err)
+    }
+  }
+
+  if (result.importLog) {
+    console.log(`import${importOptions.validation ? ' validation' : ''} logs:`)
+    console.log('--------------------')
+    console.log(result.importLog)
+    console.log('--------------------')
+  }
+
+  if (result.entitiesCount) {
+    let count = 0
+    const entityCountPerSet = []
+
+    result.entitiesCount = Object.keys(result.entitiesCount).reduce((acu, entitySet) => {
+      const entitySetCount = result.entitiesCount[entitySet]
+
+      if (entitySetCount > 0) {
+        entityCountPerSet.push(`${entitySet} ${entitySetCount}`)
+        count += entitySetCount
+        acu[entitySet] = entitySetCount
+      }
+
+      return acu
+    }, {})
+
+    if (entityCountPerSet.length > 0) {
+      console.log(`${!importOptions.validation ? 'imported by ' : ''}entitySet${importOptions.validation ? ' in zip' : ''}: ${entityCountPerSet.join(', ')}`)
+    }
+
+    console.log(`total entities ${importOptions.validation ? 'in zip' : 'imported'}: ${count}`)
+  }
+
+  console.log(`import${importOptions.validation ? ' validation' : ''} finished`)
+
+  return result
+}
+
+function onImportError (error) {
+  console.error('importing has finished with errors:')
+  return error
+}
+
+function getOptions (argv) {
+  let importOpts = {}
+  let remote = null
+
+  if (argv.validation) {
+    importOpts.validation = argv.validation
+  }
+
+  if (argv.targetFolder) {
+    importOpts.targetFolder = argv.targetFolder
+  }
+
+  if (argv.fullImport) {
+    importOpts.fullImport = argv.fullImport
+  }
+
+  if (argv.serverUrl) {
+    remote = {
+      url: argv.serverUrl
+    }
+  }
+
+  if (argv.user && argv.serverUrl) {
+    remote.user = argv.user
+  }
+
+  if (argv.password && argv.serverUrl) {
+    remote.password = argv.password
+  }
+
+  return {
+    import: importOpts,
+    remote
+  }
+}
+
+function getUsage (command) {
+  return [
+    `Usage:\n`,
+    `${command} <zipFile>`,
+    `${command} <zipFile> --serverUrl=<url>`,
+    `${command} <zipFile> --serverUrl=<url> --user=<user> --password=<password>`
+  ].join('\n')
+}
+
+function getExamples (command) {
+  return [
+    [`${command} jsreportExport.zip`, `Import the zip file into the local instance`],
+    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com`, `Import the zip file into the jsreport instance at http://jsreport-host.com`],
+    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com --user admin --password xxxx`, `Import the zip file into the authenticated jsreport instance at http://jsreport-host.com`],
+    [`${command} jsreportExport.zip --fullImport`, `Execute a full import into the local instance`],
+    [`${command} jsreportExport.zip --targetFolder=folderShortid`, `Execute an import into a target folder, the entities of the zip will be imported inside the specified folder`],
+    [`${command} jsreportExport.zip --validation`, `Execute an import validation of the zip file into the local instance, the import won't be done`]
+  ]
+}
