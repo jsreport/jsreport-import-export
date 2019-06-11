@@ -78,7 +78,7 @@ exports.builder = (yargs) => {
         }
 
         if (argv.entitiesPath != null) {
-          argv.entitiesPath = normalizePath('entitiesPath', argv.entitiesPath, {
+          argv.entitiesPath = normalizePath(argv.context.cwd, 'entitiesPath', argv.entitiesPath, {
             read: true,
             json: true,
             strict: true
