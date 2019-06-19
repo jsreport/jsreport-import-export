@@ -72,6 +72,7 @@
     "node": ">=8.9"
   },
   "files": [
+    "cli",
     "lib",
     "studio",
     "index.js",
