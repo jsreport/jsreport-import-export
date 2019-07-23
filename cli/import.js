@@ -90,12 +90,12 @@ exports.builder = (yargs) => {
 exports.handler = async (argv) => {
   const zipFilePath = argv._[1]
   const context = argv.context
-  const verbose = argv.verbose
+  const logger = context.logger
   const options = getOptions(argv)
 
   if (options.remote) {
     // connect to a remote server
-    console.log(`starting${options.import && options.import.validation ? ' validation' : ''} import${
+    logger.info(`starting${options.import && options.import.validation ? ' validation' : ''} import${
       options.import && options.import.fullImport ? ' (full import)' : ''
     }${
       options.import && options.import.targetFolder ? ` (target folder: ${options.import.targetFolder})` : ''
@@ -103,7 +103,7 @@ exports.handler = async (argv) => {
 
     try {
       const result = await startImport(null, {
-        verbose,
+        logger,
         importOptions: options.import,
         input: zipFilePath,
         remote: options.remote
@@ -124,9 +124,7 @@ exports.handler = async (argv) => {
   const daemonHandler = context.daemonHandler
   const findProcessByCWD = daemonHandler.findProcessByCWD
 
-  if (verbose) {
-    console.log('looking for previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
-  }
+  logger.debug('looking for previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
 
   // first, try to look up if there is an existing process
   // "daemonized" before in the CWD
@@ -141,15 +139,13 @@ exports.handler = async (argv) => {
   // if process was found, just connect to it,
   // otherwise just continue processing
   if (processInfo) {
-    if (verbose) {
-      console.log(`using instance daemonized previously (pid: ${processInfo.pid})..`)
-    }
+    logger.debug(`using instance daemonized previously (pid: ${processInfo.pid})..`)
 
     const adminAuthentication = processInfo.adminAuthentication || {}
 
     try {
       const result = await startImport(null, {
-        verbose,
+        logger,
         importOptions: options.import,
         input: zipFilePath,
         remote: {
@@ -167,21 +163,15 @@ exports.handler = async (argv) => {
     }
   }
 
-  if (verbose) {
-    console.log('there is no previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
-  }
+  logger.debug('there is no previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
 
   try {
-    if (verbose) {
-      console.log('trying to start an instance in cwd:', cwd)
-    }
+    logger.debug('trying to start an instance in cwd:', cwd)
 
     const _instance = await getInstance(cwd)
     let jsreportInstance
 
-    if (verbose) {
-      console.log('disabling express extension..')
-    }
+    logger.debug('disabling express extension..')
 
     if (typeof _instance === 'function') {
       jsreportInstance = _instance()
@@ -199,14 +189,14 @@ exports.handler = async (argv) => {
 
     await initInstance(jsreportInstance)
 
-    console.log(`starting${options.import && options.import.validation ? ' validation' : ''} import${
+    logger.info(`starting${options.import && options.import.validation ? ' validation' : ''} import${
       options.import && options.import.fullImport ? ' (full import)' : ''
     }${
       options.import && options.import.targetFolder ? ` (target folder: ${options.import.targetFolder})` : ''
     } in local instance..`)
 
     return (await startImport(jsreportInstance, {
-      verbose: verbose,
+      logger,
       importOptions: options.import,
       input: zipFilePath
     }))
@@ -220,18 +210,16 @@ exports.handler = async (argv) => {
   }
 }
 
-async function startImport (jsreportInstance, { remote, importOptions, input, verbose }) {
+async function startImport (jsreportInstance, { remote, importOptions, input, logger }) {
   let result = {}
 
-  if (verbose) {
-    if (remote) {
-      console.log('remote server options:')
-      console.log(remote)
-    }
-
-    console.log('importing with options:')
-    console.log(JSON.stringify(importOptions, null, 2))
+  if (remote) {
+    logger.debug('remote server options:')
+    logger.debug(remote)
   }
+
+  logger.debug('importing with options:')
+  logger.debug(JSON.stringify(importOptions, null, 2))
 
   if (remote) {
     try {
@@ -298,7 +286,7 @@ async function startImport (jsreportInstance, { remote, importOptions, input, ve
 
       if (customError) {
         customError.originalError = err
-        throw onImportError(customError)
+        throw onImportError(customError, logger)
       }
 
       throw err
@@ -324,15 +312,15 @@ async function startImport (jsreportInstance, { remote, importOptions, input, ve
         result.entitiesCount = importResult.entitiesCount
       }
     } catch (err) {
-      throw onImportError(err)
+      throw onImportError(err, logger)
     }
   }
 
   if (result.importLog) {
-    console.log(`import${importOptions.validation ? ' validation' : ''} logs:`)
-    console.log('--------------------')
-    console.log(result.importLog)
-    console.log('--------------------')
+    logger.info(`import${importOptions.validation ? ' validation' : ''} logs:`)
+    logger.info('--------------------')
+    logger.info(result.importLog)
+    logger.info('--------------------')
   }
 
   if (result.entitiesCount) {
@@ -352,19 +340,19 @@ async function startImport (jsreportInstance, { remote, importOptions, input, ve
     }, {})
 
     if (entityCountPerSet.length > 0) {
-      console.log(`${!importOptions.validation ? 'imported by ' : ''}entitySet${importOptions.validation ? ' in zip' : ''}: ${entityCountPerSet.join(', ')}`)
+      logger.info(`${!importOptions.validation ? 'imported by ' : ''}entitySet${importOptions.validation ? ' in zip' : ''}: ${entityCountPerSet.join(', ')}`)
     }
 
-    console.log(`total entities ${importOptions.validation ? 'in zip' : 'imported'}: ${count}`)
+    logger.info(`total entities ${importOptions.validation ? 'in zip' : 'imported'}: ${count}`)
   }
 
-  console.log(`import${importOptions.validation ? ' validation' : ''} finished`)
+  logger.info(`import${importOptions.validation ? ' validation' : ''} finished`)
 
   return result
 }
 
-function onImportError (error) {
-  console.error('importing has finished with errors:')
+function onImportError (error, logger) {
+  logger.error('importing has finished with errors:')
   return error
 }
 

@@ -97,18 +97,18 @@ exports.builder = (yargs) => {
 exports.handler = async (argv) => {
   const zipFilePath = argv._[1]
   const context = argv.context
-  const verbose = argv.verbose
+  const logger = context.logger
   const options = getOptions(argv)
 
   if (options.remote) {
     // connect to a remote server
-    console.log(`starting export ${
+    logger.info(`starting export ${
       options.export && options.export.selection ? ` (entities: ${options.export.selection.join(', ')})` : '(all entities)'
     } in ${argv.serverUrl}..`)
 
     try {
       const result = await startExport(null, {
-        verbose,
+        logger,
         exportOptions: options.export,
         output: zipFilePath,
         remote: options.remote
@@ -129,9 +129,7 @@ exports.handler = async (argv) => {
   const daemonHandler = context.daemonHandler
   const findProcessByCWD = daemonHandler.findProcessByCWD
 
-  if (verbose) {
-    console.log('looking for previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
-  }
+  logger.debug('looking for previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
 
   // first, try to look up if there is an existing process
   // "daemonized" before in the CWD
@@ -146,15 +144,13 @@ exports.handler = async (argv) => {
   // if process was found, just connect to it,
   // otherwise just continue processing
   if (processInfo) {
-    if (verbose) {
-      console.log(`using instance daemonized previously (pid: ${processInfo.pid})..`)
-    }
+    logger.debug(`using instance daemonized previously (pid: ${processInfo.pid})..`)
 
     const adminAuthentication = processInfo.adminAuthentication || {}
 
     try {
       const result = await startExport(null, {
-        verbose,
+        logger,
         exportOptions: options.export,
         output: zipFilePath,
         remote: {
@@ -172,21 +168,15 @@ exports.handler = async (argv) => {
     }
   }
 
-  if (verbose) {
-    console.log('there is no previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
-  }
+  logger.debug('there is no previously daemonized instance in:', workerSockPath, 'cwd:', cwd)
 
   try {
-    if (verbose) {
-      console.log('trying to start an instance in cwd:', cwd)
-    }
+    logger.debug('trying to start an instance in cwd:', cwd)
 
     const _instance = await getInstance(cwd)
     let jsreportInstance
 
-    if (verbose) {
-      console.log('disabling express extension..')
-    }
+    logger.debug('disabling express extension..')
 
     if (typeof _instance === 'function') {
       jsreportInstance = _instance()
@@ -204,12 +194,12 @@ exports.handler = async (argv) => {
 
     await initInstance(jsreportInstance)
 
-    console.log(`starting export ${
+    logger.info(`starting export ${
       options.export && options.export.selection ? ` (entities: ${options.export.selection.join(', ')})` : '(all entities)'
     } in local instance..`)
 
     return (await startExport(jsreportInstance, {
-      verbose: verbose,
+      logger,
       exportOptions: options.export,
       output: zipFilePath
     }))
@@ -223,18 +213,16 @@ exports.handler = async (argv) => {
   }
 }
 
-async function startExport (jsreportInstance, { remote, exportOptions, output, verbose }) {
+async function startExport (jsreportInstance, { remote, exportOptions, output, logger }) {
   let result
 
-  if (verbose) {
-    if (remote) {
-      console.log('remote server options:')
-      console.log(remote)
-    }
-
-    console.log('exporting with options:')
-    console.log(JSON.stringify(exportOptions, null, 2))
+  if (remote) {
+    logger.debug('remote server options:')
+    logger.debug(remote)
   }
+
+  logger.debug('exporting with options:')
+  logger.debug(JSON.stringify(exportOptions, null, 2))
 
   if (remote) {
     try {
@@ -254,7 +242,7 @@ async function startExport (jsreportInstance, { remote, exportOptions, output, v
 
       const response = await doRequest(reqOpts)
 
-      result = await saveResponse(response.data, output)
+      result = await saveResponse(logger, response.data, output)
 
       if (response.headers && response.headers['export-entities-count'] != null) {
         result.entitiesCount = JSON.parse(response.headers['export-entities-count'])
@@ -282,7 +270,7 @@ async function startExport (jsreportInstance, { remote, exportOptions, output, v
 
       if (customError) {
         customError.originalError = err
-        throw onExportError(customError)
+        throw onExportError(customError, logger)
       }
 
       throw err
@@ -293,13 +281,13 @@ async function startExport (jsreportInstance, { remote, exportOptions, output, v
       const exportResultIsStream = typeof exportResult === 'object' && typeof exportResult.pipe === 'function'
 
       // compatibility with older versions
-      result = await saveResponse(exportResultIsStream ? exportResult : exportResult.stream, output)
+      result = await saveResponse(logger, exportResultIsStream ? exportResult : exportResult.stream, output)
 
       if (!exportResultIsStream && exportResult.entitiesCount != null) {
         result.entitiesCount = exportResult.entitiesCount
       }
     } catch (err) {
-      throw onExportError(err)
+      throw onExportError(err, logger)
     }
   }
 
@@ -320,22 +308,22 @@ async function startExport (jsreportInstance, { remote, exportOptions, output, v
     }, {})
 
     if (entityCountPerSet.length > 0) {
-      console.log(`exported by entitySet: ${entityCountPerSet.join(', ')}`)
+      logger.info(`exported by entitySet: ${entityCountPerSet.join(', ')}`)
     }
 
-    console.log(`total entities exported: ${count}`)
+    logger.info(`total entities exported: ${count}`)
   }
 
-  console.log('export finished')
+  logger.info('export finished')
 
   return result
 }
 
-async function saveResponse (stream, output) {
+async function saveResponse (logger, stream, output) {
   const outputStream = writeFileFromStream(stream, output)
 
   return new Promise((resolve, reject) => {
-    listenOutputStream(outputStream, () => {
+    listenOutputStream(logger, outputStream, () => {
       return resolve({
         output: output
       })
@@ -343,14 +331,14 @@ async function saveResponse (stream, output) {
   })
 }
 
-function listenOutputStream (outputStream, onFinish, onError) {
+function listenOutputStream (logger, outputStream, onFinish, onError) {
   outputStream.on('finish', () => {
-    console.log('exporting has finished successfully and saved in:', outputStream.path)
+    logger.info('exporting has finished successfully and saved in:', outputStream.path)
     onFinish()
   })
 
   outputStream.on('error', (err) => {
-    onError(onExportError(err))
+    onError(onExportError(err, logger))
   })
 }
 
@@ -362,8 +350,8 @@ function writeFileFromStream (stream, output) {
   return outputStream
 }
 
-function onExportError (error) {
-  console.error('exporting has finished with errors:')
+function onExportError (error, logger) {
+  logger.error('exporting has finished with errors:')
   return error
 }
 
