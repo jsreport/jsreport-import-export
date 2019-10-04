@@ -7,10 +7,18 @@ const Promise = require('bluebird')
 const path = require('path')
 const { unzipEntities } = require('../lib/helpers')
 
-const mongo = { store: { provider: 'mongodb' }, extensions: { 'mongodb-store': { databaseName: 'test', address: '127.0.0.1' } } }
-const fsStore = { store: { provider: 'fs' } }
+const encryption = { secretKey: 'demo123456789012', enabled: true }
+
+const inMemory = { encryption: { ...encryption } }
+
+const mongo = { encryption: { ...encryption }, store: { provider: 'mongodb' }, extensions: { 'mongodb-store': { databaseName: 'test', address: '127.0.0.1' } } }
+
+const fsStore = { encryption: { ...encryption }, store: { provider: 'fs' } }
 
 const postgres = {
+  encryption: {
+    ...encryption
+  },
   store: {
     provider: 'postgres'
   },
@@ -103,7 +111,7 @@ describe('exports', () => {
   let reporter
 
   describe('in memory store', () => {
-    common()
+    common(inMemory)
   })
 
   describe('fs store', () => {
@@ -125,6 +133,36 @@ describe('exports', () => {
           .use(require('jsreport-templates')())
           .use(require('jsreport-data')())
           .use(require('jsreport-assets')())
+          .use((reporter) => {
+            reporter.documentStore.registerComplexType('SecureTestingType', {
+              valueRaw: { type: 'Edm.String' },
+              valueSecure: { type: 'Edm.String', encrypted: true, visible: false }
+            })
+
+            reporter.documentStore.model.entityTypes.TemplateType.secureTesting = {
+              type: 'jsreport.SecureTestingType'
+            }
+
+            reporter.initializeListeners.add('secure-testing', () => {
+              reporter.documentStore.collection('templates').beforeInsertListeners.add('secure-testing', async (doc, req) => {
+                if (!doc.secureTesting || !doc.secureTesting.valueRaw) {
+                  return
+                }
+
+                doc.secureTesting.valueSecure = await reporter.encryption.encrypt(doc.secureTesting.valueRaw)
+                doc.secureTesting.valueRaw = null
+              })
+
+              reporter.documentStore.collection('templates').beforeUpdateListeners.add('secure-testing', async (q, u, req) => {
+                if (!u.$set.secureTesting || !u.$set.secureTesting.valueRaw) {
+                  return
+                }
+
+                u.$set.secureTesting.valueSecure = await reporter.encryption.encrypt(u.$set.secureTesting.valueRaw)
+                u.$set.secureTesting.valueRaw = null
+              })
+            })
+          })
           .use(require('../')())
         cfg(res)
         return res
@@ -133,7 +171,9 @@ describe('exports', () => {
 
       await reporter.init()
       await reporter.documentStore.drop()
+
       reporter = createReporter()
+
       await reporter.init()
     })
 
@@ -160,6 +200,50 @@ describe('exports', () => {
       const { stream } = await reporter.export()
       const exportPath = await saveExportStream(reporter, stream)
       return reporter.import(exportPath)
+    })
+
+    it('should be able to export encrypted properties and store it as raw value', async () => {
+      const t = await reporter.documentStore.collection('templates').insert({
+        name: 'secure',
+        engine: 'none',
+        recipe: 'html',
+        secureTesting: {
+          valueRaw: 'foo'
+        }
+      })
+
+      reporter.encryption.isEncrypted(t.secureTesting.valueSecure).should.be.eql(true)
+
+      const { stream } = await reporter.export()
+      const exportPath = await saveExportStream(reporter, stream)
+      const exportContents = await unzipEntities(exportPath)
+
+      exportContents.entities.templates[0].secureTesting.valueSecure.should.be.eql('foo')
+    })
+
+    it('should be able to import encrypted properties and store it as encrypted value', async () => {
+      const t = await reporter.documentStore.collection('templates').insert({
+        name: 'secure',
+        engine: 'none',
+        recipe: 'html',
+        secureTesting: {
+          valueRaw: 'foo'
+        }
+      })
+
+      reporter.encryption.isEncrypted(t.secureTesting.valueSecure).should.be.eql(true)
+
+      const { stream } = await reporter.export()
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await reporter.documentStore.collection('templates').remove({})
+
+      await reporter.import(exportPath)
+
+      const res = await reporter.documentStore.collection('templates').find({})
+
+      res.should.have.length(1)
+      reporter.encryption.isEncrypted(res[0].secureTesting.valueSecure).should.be.eql(true)
     })
 
     it('should import back deleted entity', async () => {

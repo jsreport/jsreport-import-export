@@ -52,7 +52,7 @@
     "jsreport-assets": "1.2.0",
     "jsreport-authentication": "2.3.0",
     "jsreport-cli": "2.1.0",
-    "jsreport-core": "2.6.1",
+    "jsreport-core": "github:jsreport/jsreport-core",
     "jsreport-data": "2.1.0",
     "jsreport-express": "2.5.0",
     "jsreport-fs-store": "2.5.0",
