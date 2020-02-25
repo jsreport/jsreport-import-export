@@ -171,6 +171,7 @@ describe('exports', () => {
 
       await reporter.init()
       await reporter.documentStore.drop()
+      await reporter.documentStore.close()
 
       reporter = createReporter()
 
