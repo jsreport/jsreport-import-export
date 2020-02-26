@@ -535,6 +535,7 @@ var ImportModal = function (_Component2) {
     _this4.state = {
       selectedFolderShortid: props.options != null && props.options.selectedFolderShortid ? props.options.selectedFolderShortid : null,
       fullImport: false,
+      continueOnFail: false,
       validated: false
     };
     return _this4;
@@ -635,6 +636,7 @@ var ImportModal = function (_Component2) {
                 return _jsreportStudio2.default.api.post('api/import', {
                   params: {
                     fullImport: this.state.fullImport,
+                    continueOnFail: this.state.continueOnFail,
                     targetFolder: this.state.selectedFolderShortid
                   },
                   attach: { filename: 'import.zip', file: this.file }
@@ -756,7 +758,7 @@ var ImportModal = function (_Component2) {
           ),
           this.state.fullImport && _react2.default.createElement(
             'p',
-            { style: { marginTop: '15px' } },
+            { style: { marginTop: '10px' } },
             'A ',
             _react2.default.createElement(
               'b',
@@ -819,6 +821,45 @@ var ImportModal = function (_Component2) {
                 });
               }
             })
+          ),
+          _react2.default.createElement(
+            'div',
+            null,
+            _react2.default.createElement(
+              'label',
+              { style: { opacity: this.state.processing === true || this.state.validated ? 0.7 : 1 } },
+              _react2.default.createElement('input', {
+                type: 'checkbox',
+                style: { verticalAlign: 'middle' },
+                disabled: this.state.processing === true || this.state.validated,
+                onChange: function onChange(e) {
+                  _this6.setState({
+                    continueOnFail: e.target.checked
+                  });
+                }
+              }),
+              _react2.default.createElement(
+                'span',
+                { style: { verticalAlign: 'middle' } },
+                'Continue import on fail'
+              )
+            ),
+            this.state.continueOnFail && _react2.default.createElement(
+              'p',
+              { style: { marginTop: '10px' } },
+              _react2.default.createElement(
+                'b',
+                null,
+                'Continue import on fail'
+              ),
+              ' means that ',
+              _react2.default.createElement(
+                'b',
+                null,
+                'the import will try to process all the entities in the zip, even if there is some of them that causes conflicts'
+              ),
+              ', import is transactional operation by default but when this option is enabled it allows the importing to ignore some errors and continue processing.'
+            )
           ),
           !this.state.validated && _react2.default.createElement(
             'div',

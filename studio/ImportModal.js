@@ -52,6 +52,7 @@ export default class ImportModal extends Component {
     this.state = {
       selectedFolderShortid: props.options != null && props.options.selectedFolderShortid ? props.options.selectedFolderShortid : null,
       fullImport: false,
+      continueOnFail: false,
       validated: false
     }
   }
@@ -116,6 +117,7 @@ export default class ImportModal extends Component {
       const result = await Studio.api.post('api/import', {
         params: {
           fullImport: this.state.fullImport,
+          continueOnFail: this.state.continueOnFail,
           targetFolder: this.state.selectedFolderShortid
         },
         attach: { filename: 'import.zip', file: this.file }
@@ -176,7 +178,7 @@ export default class ImportModal extends Component {
             </label>
           </div>
           {this.state.fullImport && (
-            <p style={{ marginTop: '15px' }}>
+            <p style={{ marginTop: '10px' }}>
               A <b>full import</b> means that <b>all the entities that are not present in the zip will be deleted</b>, after the import <b>you will have only the entities that were present in the zip</b>.
             </p>
           )}
@@ -204,6 +206,26 @@ export default class ImportModal extends Component {
                 })
               }}
             />
+          </div>
+          <div>
+            <label style={{ opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1 }}>
+              <input
+                type='checkbox'
+                style={{ verticalAlign: 'middle' }}
+                disabled={this.state.processing === true || this.state.validated}
+                onChange={(e) => {
+                  this.setState({
+                    continueOnFail: e.target.checked
+                  })
+                }}
+              />
+              <span style={{ verticalAlign: 'middle' }}>Continue import on fail</span>
+            </label>
+            {this.state.continueOnFail && (
+              <p style={{ marginTop: '10px' }}>
+                <b>Continue import on fail</b> means that <b>the import will try to process all the entities in the zip, even if there is some of them that causes conflicts</b>, import is transactional operation by default but when this option is enabled it allows the importing to ignore some errors and continue processing.
+              </p>
+            )}
           </div>
           {!this.state.validated && (
             <div className='button-bar'>
