@@ -277,7 +277,7 @@ async function startExport (jsreportInstance, { remote, exportOptions, output, l
     }
   } else {
     try {
-      const exportResult = await jsreportInstance.export(exportOptions != null ? exportOptions.selection : undefined)
+      const exportResult = await jsreportInstance.export(exportOptions != null ? exportOptions.selection : undefined, jsreportInstance.Request({}))
       const exportResultIsStream = typeof exportResult === 'object' && typeof exportResult.pipe === 'function'
 
       // compatibility with older versions

@@ -296,9 +296,9 @@ async function startImport (jsreportInstance, { remote, importOptions, input, lo
       let importResult
 
       if (importOptions.validation) {
-        importResult = await jsreportInstance.importValidation(input, importOptions)
+        importResult = await jsreportInstance.importValidation(input, importOptions, jsreportInstance.Request({}))
       } else {
-        importResult = await jsreportInstance.import(input, importOptions)
+        importResult = await jsreportInstance.import(input, importOptions, jsreportInstance.Request({}))
       }
 
       // compatibility with older versions
