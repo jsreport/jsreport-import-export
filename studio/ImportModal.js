@@ -55,10 +55,14 @@ export default class ImportModal extends Component {
       continueOnFail: false,
       validated: false
     }
+
+    if (props.options && props.options.selectedFile) {
+      this.upload(props.options.selectedFile)
+    }
   }
 
-  upload (e) {
-    if (!e.target.files.length) {
+  upload (file) {
+    if (!file) {
       return
     }
 
@@ -68,7 +72,7 @@ export default class ImportModal extends Component {
       log: 'Validating import....'
     })
 
-    this.file = e.target.files[0]
+    this.file = file
     const reader = new FileReader()
 
     reader.onloadend = async () => {
@@ -152,7 +156,19 @@ export default class ImportModal extends Component {
   render () {
     return (
       <div>
-        <input type='file' key='file' ref='file' style={{display: 'none'}} onChange={(e) => this.upload(e)} />
+        <input
+          type='file'
+          key='file'
+          ref='file'
+          style={{display: 'none'}}
+          onChange={(e) => {
+            if (!e.target.files.length) {
+              return
+            }
+
+            this.upload(e.target.files[0])
+          }}
+        />
 
         <h1><i className='fa fa-upload' /> Import objects</h1>
 

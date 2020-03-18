@@ -67,3 +67,40 @@ Studio.addEntityTreeContextMenuItemsResolver(({
     items
   }
 })
+
+Studio.entityTreeDropResolvers.push({
+  type: Studio.dragAndDropNativeTypes.FILE,
+  async handler ({
+    draggedItem,
+    dragOverContext,
+    dropComplete
+  }) {
+    const files = draggedItem.files
+
+    let targetInfo = {
+      shortid: null
+    }
+
+    if (dragOverContext && dragOverContext.containerTargetEntity) {
+      targetInfo.shortid = dragOverContext.containerTargetEntity.shortid
+    }
+
+    if (
+      files &&
+      files.length === 1 &&
+      files[0].type === 'application/zip'
+    ) {
+      dropComplete()
+
+      let opts = {
+        selectedFile: files[0]
+      }
+
+      if (targetInfo.shortid) {
+        opts.selectedFolderShortid = targetInfo.shortid
+      }
+
+      Studio.openModal(ImportModal, opts)
+    }
+  }
+})

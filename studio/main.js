@@ -117,6 +117,8 @@ var _jsreportStudio2 = _interopRequireDefault(_jsreportStudio);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
+
 _jsreportStudio2.default.addToolbarComponent(function (props) {
   return React.createElement(
     'div',
@@ -191,6 +193,55 @@ _jsreportStudio2.default.addEntityTreeContextMenuItemsResolver(function (_ref) {
     grouped: true,
     items: items
   };
+});
+
+_jsreportStudio2.default.entityTreeDropResolvers.push({
+  type: _jsreportStudio2.default.dragAndDropNativeTypes.FILE,
+  handler: function handler(_ref2) {
+    var _this = this;
+
+    var draggedItem = _ref2.draggedItem,
+        dragOverContext = _ref2.dragOverContext,
+        dropComplete = _ref2.dropComplete;
+    return _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
+      var files, targetInfo, opts;
+      return regeneratorRuntime.wrap(function _callee$(_context) {
+        while (1) {
+          switch (_context.prev = _context.next) {
+            case 0:
+              files = draggedItem.files;
+              targetInfo = {
+                shortid: null
+              };
+
+
+              if (dragOverContext && dragOverContext.containerTargetEntity) {
+                targetInfo.shortid = dragOverContext.containerTargetEntity.shortid;
+              }
+
+              if (files && files.length === 1 && files[0].type === 'application/zip') {
+                dropComplete();
+
+                opts = {
+                  selectedFile: files[0]
+                };
+
+
+                if (targetInfo.shortid) {
+                  opts.selectedFolderShortid = targetInfo.shortid;
+                }
+
+                _jsreportStudio2.default.openModal(_ImportModal2.default, opts);
+              }
+
+            case 4:
+            case 'end':
+              return _context.stop();
+          }
+        }
+      }, _callee, _this);
+    }))();
+  }
 });
 
 /***/ }),
@@ -538,15 +589,19 @@ var ImportModal = function (_Component2) {
       continueOnFail: false,
       validated: false
     };
+
+    if (props.options && props.options.selectedFile) {
+      _this4.upload(props.options.selectedFile);
+    }
     return _this4;
   }
 
   _createClass(ImportModal, [{
     key: 'upload',
-    value: function upload(e) {
+    value: function upload(file) {
       var _this5 = this;
 
-      if (!e.target.files.length) {
+      if (!file) {
         return;
       }
 
@@ -556,7 +611,7 @@ var ImportModal = function (_Component2) {
         log: 'Validating import....'
       });
 
-      this.file = e.target.files[0];
+      this.file = file;
       var reader = new FileReader();
 
       reader.onloadend = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
@@ -700,9 +755,19 @@ var ImportModal = function (_Component2) {
       return _react2.default.createElement(
         'div',
         null,
-        _react2.default.createElement('input', { type: 'file', key: 'file', ref: 'file', style: { display: 'none' }, onChange: function onChange(e) {
-            return _this6.upload(e);
-          } }),
+        _react2.default.createElement('input', {
+          type: 'file',
+          key: 'file',
+          ref: 'file',
+          style: { display: 'none' },
+          onChange: function onChange(e) {
+            if (!e.target.files.length) {
+              return;
+            }
+
+            _this6.upload(e.target.files[0]);
+          }
+        }),
         _react2.default.createElement(
           'h1',
           null,
