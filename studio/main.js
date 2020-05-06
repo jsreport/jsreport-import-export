@@ -297,7 +297,8 @@ var ExportModal = function (_Component) {
 
       var selections = {};
 
-      var references = _jsreportStudio2.default.getReferences();
+      var references = this.getExportableReferences(_jsreportStudio2.default.getReferences());
+
       Object.keys(references).forEach(function (k) {
         Object.keys(references[k]).forEach(function (e) {
           if (options.initialSelected != null) {
@@ -315,7 +316,21 @@ var ExportModal = function (_Component) {
           }
         });
       });
+
       this.setState(selections);
+    }
+  }, {
+    key: 'getExportableReferences',
+    value: function getExportableReferences(references) {
+      var exportableEntitySets = _jsreportStudio2.default.extensions['import-export'].options.exportableEntitySets;
+
+      return Object.keys(references).reduce(function (acu, entitySetName) {
+        if (exportableEntitySets.indexOf(entitySetName) !== -1) {
+          acu[entitySetName] = references[entitySetName];
+        }
+
+        return acu;
+      }, {});
     }
   }, {
     key: 'handleNodeSelect',
@@ -389,7 +404,8 @@ var ExportModal = function (_Component) {
     value: function render() {
       var _this3 = this;
 
-      var references = _jsreportStudio2.default.getReferences();
+      var references = this.getExportableReferences(_jsreportStudio2.default.getReferences());
+
       Object.keys(references).forEach(function (k) {
         Object.keys(references[k]).forEach(function (e) {
           return references[k][e] = Object.assign({}, references[k][e], { __selected: _this3.state[references[k][e]._id] });

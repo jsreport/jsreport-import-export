@@ -7,7 +7,8 @@ export default class ExportModal extends Component {
     const { options } = this.props
     let selections = {}
 
-    var references = Studio.getReferences()
+    const references = this.getExportableReferences(Studio.getReferences())
+
     Object.keys(references).forEach((k) => {
       Object.keys(references[k]).forEach((e) => {
         if (options.initialSelected != null) {
@@ -25,7 +26,20 @@ export default class ExportModal extends Component {
         }
       })
     })
+
     this.setState(selections)
+  }
+
+  getExportableReferences (references) {
+    const exportableEntitySets = Studio.extensions['import-export'].options.exportableEntitySets
+
+    return Object.keys(references).reduce((acu, entitySetName) => {
+      if (exportableEntitySets.indexOf(entitySetName) !== -1) {
+        acu[entitySetName] = references[entitySetName]
+      }
+
+      return acu
+    }, {})
   }
 
   handleNodeSelect (references, es, v) {
@@ -60,27 +74,32 @@ export default class ExportModal extends Component {
   }
 
   render () {
-    let references = Studio.getReferences()
+    const references = this.getExportableReferences(Studio.getReferences())
+
     Object.keys(references).forEach((k) => {
       Object.keys(references[k]).forEach((e) => (references[k][e] = Object.assign({}, references[k][e], { __selected: this.state[references[k][e]._id] })))
     })
 
-    return <div className='form-group'>
-      <div><h1><i className='fa fa-download' /> Export objects</h1></div>
-      <div style={{height: '30rem', overflow: 'auto'}}>
-        <EntityTree
-          activeEntity={Studio.getActiveEntity()}
-          entities={references}
-          selectable
-          onNodeSelect={(es, v) => this.handleNodeSelect(references, es, v)}
-          onSelect={(e, v) => this.setState({ [e._id]: !this.state[e._id] })}
-        />
+    return (
+      <div className='form-group'>
+        <div>
+          <h1><i className='fa fa-download' /> Export objects</h1>
+        </div>
+        <div style={{height: '30rem', overflow: 'auto'}}>
+          <EntityTree
+            activeEntity={Studio.getActiveEntity()}
+            entities={references}
+            selectable
+            onNodeSelect={(es, v) => this.handleNodeSelect(references, es, v)}
+            onSelect={(e, v) => this.setState({ [e._id]: !this.state[e._id] })}
+          />
+        </div>
+        <div className='button-bar'>
+          <a className='button confirmation' onClick={() => this.download()}>
+            Download
+          </a>
+        </div>
       </div>
-      <div className='button-bar'>
-        <a className='button confirmation' onClick={() => this.download()}>
-          Download
-        </a>
-      </div>
-    </div>
+    )
   }
 }
