@@ -219,7 +219,7 @@ _jsreportStudio2.default.entityTreeDropResolvers.push({
                 targetInfo.shortid = dragOverContext.containerTargetEntity.shortid;
               }
 
-              if (files && files.length === 1 && files[0].type === 'application/zip') {
+              if (files && files.length === 1 && /\.zip$/.test(files[0].name)) {
                 dropComplete();
 
                 opts = {

@@ -88,7 +88,7 @@ Studio.entityTreeDropResolvers.push({
     if (
       files &&
       files.length === 1 &&
-      files[0].type === 'application/zip'
+      /\.zip$/.test(files[0].name)
     ) {
       dropComplete()
 
