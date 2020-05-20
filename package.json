@@ -1,6 +1,6 @@
 {
   "name": "jsreport-import-export",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "jsreport extension adding templates exporting and importing API",
   "scripts": {
     "start": "jsreport-studio-start --httpPort 5488",
