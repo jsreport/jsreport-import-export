@@ -3,7 +3,6 @@ const should = require('should')
 const request = require('supertest')
 const jsreport = require('jsreport-core')
 const fs = require('fs')
-const Promise = require('bluebird')
 const path = require('path')
 const { unzipEntities } = require('../lib/helpers')
 
