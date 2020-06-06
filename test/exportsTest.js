@@ -4,6 +4,8 @@ const request = require('supertest')
 const jsreport = require('jsreport-core')
 const fs = require('fs')
 const path = require('path')
+const conflictsTest = require('./conflictsTest')
+const saveExportStream = require('./saveExportStream')
 const { unzipEntities } = require('../lib/helpers')
 
 const encryption = { secretKey: 'demo123456789012', enabled: true }
@@ -30,22 +32,6 @@ const postgres = {
       'password': 'password'
     }
   }
-}
-
-function saveExportStream (reporter, stream) {
-  return new Promise(function (resolve, reject) {
-    const exportPath = path.join(reporter.options.tempDirectory, 'myExport.zip')
-    const exportDist = fs.createWriteStream(exportPath)
-
-    stream.on('error', reject)
-    exportDist.on('error', reject)
-
-    exportDist.on('finish', function () {
-      resolve(exportPath)
-    })
-
-    stream.pipe(exportDist)
-  })
 }
 
 describe('rest api', () => {
@@ -106,24 +92,24 @@ describe('rest api', () => {
   })
 })
 
-describe('exports', () => {
+describe('import-export', () => {
   let reporter
 
   describe('in memory store', () => {
     common(inMemory)
   })
 
-  describe('fs store', () => {
-    common(fsStore, (reporter) => reporter.use(require('jsreport-fs-store')()))
-  })
-
-  describe('mongodb store', () => {
-    common(mongo, (reporter) => reporter.use(require('jsreport-mongodb-store')()))
-  })
-
-  describe('postgres store', function () {
-    common(postgres, (reporter) => reporter.use(require('jsreport-postgres-store')()))
-  })
+  // describe('fs store', () => {
+  //   common(fsStore, (reporter) => reporter.use(require('jsreport-fs-store')()))
+  // })
+  //
+  // describe('mongodb store', () => {
+  //   common(mongo, (reporter) => reporter.use(require('jsreport-mongodb-store')()))
+  // })
+  //
+  // describe('postgres store', function () {
+  //   common(postgres, (reporter) => reporter.use(require('jsreport-postgres-store')()))
+  // })
 
   function common (options = {}, cfg = () => {}) {
     beforeEach(async () => {
@@ -574,6 +560,10 @@ describe('exports', () => {
       const found = foldersRes.find((f) => f.folder && f.folder.shortid === 'target') != null
 
       found.should.be.eql(false)
+    })
+
+    describe('conflict handling', () => {
+      conflictsTest(() => reporter)
     })
   }
 })
