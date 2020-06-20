@@ -99,17 +99,17 @@ describe('import-export', () => {
     common(inMemory)
   })
 
-  // describe('fs store', () => {
-  //   common(fsStore, (reporter) => reporter.use(require('jsreport-fs-store')()))
-  // })
-  //
-  // describe('mongodb store', () => {
-  //   common(mongo, (reporter) => reporter.use(require('jsreport-mongodb-store')()))
-  // })
-  //
-  // describe('postgres store', function () {
-  //   common(postgres, (reporter) => reporter.use(require('jsreport-postgres-store')()))
-  // })
+  describe('fs store', () => {
+    common(fsStore, (reporter) => reporter.use(require('jsreport-fs-store')()))
+  })
+
+  describe('mongodb store', () => {
+    common(mongo, (reporter) => reporter.use(require('jsreport-mongodb-store')()))
+  })
+
+  describe('postgres store', function () {
+    common(postgres, (reporter) => reporter.use(require('jsreport-postgres-store')()))
+  })
 
   function common (options = {}, cfg = () => {}) {
     beforeEach(async () => {
@@ -190,6 +190,46 @@ describe('import-export', () => {
       return reporter.import(exportPath, req)
     })
 
+    it('should be able to import and preserve _id by default', async () => {
+      const req = reporter.Request({})
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
+      const { stream } = await reporter.export(undefined, req)
+      const exportPath = await saveExportStream(reporter, stream)
+      await reporter.documentStore.collection('templates').remove({})
+      await reporter.import(exportPath, req)
+      const res = await reporter.documentStore.collection('templates').find({})
+      res.should.have.length(1)
+      res[0]._id.should.be.eql(t1._id)
+      res[0].name.should.be.eql('foo')
+    })
+
+    it('should be able to import and preserve humanReadableKey by default', async () => {
+      const req = reporter.Request({})
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
+      const { stream } = await reporter.export(undefined, req)
+      const exportPath = await saveExportStream(reporter, stream)
+      await reporter.documentStore.collection('templates').remove({})
+      await reporter.import(exportPath, req)
+      const res = await reporter.documentStore.collection('templates').find({})
+      res.should.have.length(1)
+      res[0].shortid.should.be.eql(t1.shortid)
+      res[0].name.should.be.eql('foo')
+    })
+
+    it('should be able to import and preserve _id, humanReadableKey by default', async () => {
+      const req = reporter.Request({})
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
+      const { stream } = await reporter.export(undefined, req)
+      const exportPath = await saveExportStream(reporter, stream)
+      await reporter.documentStore.collection('templates').remove({})
+      await reporter.import(exportPath, req)
+      const res = await reporter.documentStore.collection('templates').find({})
+      res.should.have.length(1)
+      res[0]._id.should.be.eql(t1._id)
+      res[0].shortid.should.be.eql(t1.shortid)
+      res[0].name.should.be.eql('foo')
+    })
+
     it('should be able to export encrypted properties and store it as raw value', async () => {
       const t = await reporter.documentStore.collection('templates').insert({
         name: 'secure',
@@ -249,13 +289,13 @@ describe('import-export', () => {
     })
 
     it('should update entity in import', async () => {
-      await reporter.documentStore.collection('templates').insert({ name: 'foo', content: 'x', engine: 'none', recipe: 'html' })
       const req = reporter.Request({})
+      await reporter.documentStore.collection('templates').insert({ name: 'foo', content: 'x', engine: 'none', recipe: 'html' }, req)
       const { stream } = await reporter.export(undefined, req)
       const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').update({}, { $set: { content: 'y' } })
+      await reporter.documentStore.collection('templates').update({ name: 'foo' }, { $set: { content: 'y' } }, req)
       await reporter.import(exportPath, req)
-      const res = await reporter.documentStore.collection('templates').find({})
+      const res = await reporter.documentStore.collection('templates').find({}, req)
       res.should.have.length(1)
       res[0].name.should.be.eql('foo')
       res[0].content.should.be.eql('x')
@@ -360,6 +400,50 @@ describe('import-export', () => {
     })
 
     it('should be able to import into target folder', async () => {
+      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html' })
+      const req = reporter.Request({})
+      const { stream } = await reporter.export([e1._id.toString()], req)
+      const exportPath = await saveExportStream(reporter, stream)
+      await reporter.documentStore.collection('templates').remove({})
+
+      const targetFolder = await reporter.documentStore.collection('folders').insert({ name: 'target', shortid: 'target' })
+
+      await reporter.import(exportPath, {
+        targetFolder: targetFolder.shortid
+      }, req)
+
+      const foldersRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+      foldersRes.should.have.length(1)
+      templatesRes.should.have.length(1)
+      foldersRes[0].name.should.be.eql(targetFolder.name)
+      templatesRes[0].name.should.be.eql(e1.name)
+      templatesRes[0].folder.shortid.should.be.eql(targetFolder.shortid)
+    })
+
+    it('should be able to import into target folder (root entity explicetly contains folder: null)', async () => {
+      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: null })
+      const req = reporter.Request({})
+      const { stream } = await reporter.export([e1._id.toString()], req)
+      const exportPath = await saveExportStream(reporter, stream)
+      await reporter.documentStore.collection('templates').remove({})
+
+      const targetFolder = await reporter.documentStore.collection('folders').insert({ name: 'target', shortid: 'target' })
+
+      await reporter.import(exportPath, {
+        targetFolder: targetFolder.shortid
+      }, req)
+
+      const foldersRes = await reporter.documentStore.collection('folders').find({})
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+      foldersRes.should.have.length(1)
+      templatesRes.should.have.length(1)
+      foldersRes[0].name.should.be.eql(targetFolder.name)
+      templatesRes[0].name.should.be.eql(e1.name)
+      templatesRes[0].folder.shortid.should.be.eql(targetFolder.shortid)
+    })
+
+    it('should be able to import into target folder (folder restored)', async () => {
       await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
       const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
       const req = reporter.Request({})
@@ -388,7 +472,7 @@ describe('import-export', () => {
       foldersRes.find((f) => f.folder && f.folder.shortid === 'target').name.should.be.eql('level1')
     })
 
-    it('should be able to handle full import mode (delete extra entities)', async () => {
+    it('should be able to handle full import mode (delete extra entities) and preserve _id', async () => {
       const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html' })
       const t2 = await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html' })
       const req = reporter.Request({})
@@ -414,6 +498,65 @@ describe('import-export', () => {
 
       allExpectedTemplates.forEach((t) => {
         templatesRes.should.matchAny((e) => e._id.toString().should.be.eql(t._id.toString()))
+      })
+    })
+
+    it('should be able to handle full import mode (delete extra entities) and preserve humanReadableKey', async () => {
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html' })
+      const t2 = await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html' })
+      const req = reporter.Request({})
+
+      const { stream } = await reporter.export([
+        t1._id.toString(),
+        t2._id.toString()
+      ], req)
+
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await reporter.documentStore.collection('templates').insert({ name: 'c', engine: 'none', recipe: 'html' })
+
+      await reporter.import(exportPath, {
+        fullImport: true
+      }, req)
+
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+
+      templatesRes.should.have.length(2)
+
+      const allExpectedTemplates = [t1, t2]
+
+      allExpectedTemplates.forEach((t) => {
+        templatesRes.should.matchAny((e) => e.shortid.toString().should.be.eql(t.shortid.toString()))
+      })
+    })
+
+    it('should be able to handle full import mode (delete extra entities) and preserve _id, humanReadableKey', async () => {
+      const t1 = await reporter.documentStore.collection('templates').insert({ name: 'a', engine: 'none', recipe: 'html' })
+      const t2 = await reporter.documentStore.collection('templates').insert({ name: 'b', engine: 'none', recipe: 'html' })
+      const req = reporter.Request({})
+
+      const { stream } = await reporter.export([
+        t1._id.toString(),
+        t2._id.toString()
+      ], req)
+
+      const exportPath = await saveExportStream(reporter, stream)
+
+      await reporter.documentStore.collection('templates').insert({ name: 'c', engine: 'none', recipe: 'html' })
+
+      await reporter.import(exportPath, {
+        fullImport: true
+      }, req)
+
+      const templatesRes = await reporter.documentStore.collection('templates').find({})
+
+      templatesRes.should.have.length(2)
+
+      const allExpectedTemplates = [t1, t2]
+
+      allExpectedTemplates.forEach((t) => {
+        templatesRes.should.matchAny((e) => e._id.toString().should.be.eql(t._id.toString()))
+        templatesRes.should.matchAny((e) => e.shortid.toString().should.be.eql(t.shortid.toString()))
       })
     })
 
@@ -538,28 +681,6 @@ describe('import-export', () => {
       allExpectedFolders.forEach((f) => {
         foldersRes.should.matchAny((e) => e._id.toString().should.be.eql(f._id.toString()))
       })
-    })
-
-    it('should throw error when import into target folder finds duplicate entity', async () => {
-      await reporter.documentStore.collection('folders').insert({ name: 'level1', shortid: 'level1' })
-      const e1 = await reporter.documentStore.collection('templates').insert({ name: 'foo', engine: 'none', recipe: 'html', folder: { shortid: 'level1' } })
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([e1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-
-      const targetFolder = await reporter.documentStore.collection('folders').insert({ name: 'target', shortid: 'target' })
-
-      await reporter.import(exportPath, {
-        targetFolder: targetFolder.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      foldersRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-      const found = foldersRes.find((f) => f.folder && f.folder.shortid === 'target') != null
-
-      found.should.be.eql(false)
     })
 
     describe('conflict handling', () => {

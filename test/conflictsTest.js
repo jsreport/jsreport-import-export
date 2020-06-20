@@ -315,10 +315,10 @@ module.exports = (getReporter) => {
       dataEntitiesRes[0].name.should.be.eql('data')
       dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
       JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.be.eql(f1.shortid)
+      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
       templatesRes[0].name.should.be.eql('foo')
       templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.be.eql(f1.shortid)
+      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity insert when humanReadableKey conflict on different folder level (import on root)', async () => {
@@ -500,13 +500,13 @@ module.exports = (getReporter) => {
 
       dataEntitiesRes.should.matchAny((d) => (
         d.name.should.be.eql('data') &&
-        d.folder.shortid.be.eql(f1.shortid) &&
+        d.folder.shortid.should.be.eql(f1.shortid) &&
         JSON.parse(d.dataJson).a.should.be.eql('a')
       ))
 
       dataEntitiesRes.should.matchAny((d) => (
         d.name.should.be.eql('data2') &&
-        should(d.folder).should.be.not.ok() &&
+        should(d.folder).be.not.ok() &&
         JSON.parse(d.dataJson).a.should.be.eql('b')
       ))
 
@@ -680,10 +680,10 @@ module.exports = (getReporter) => {
       dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
       dataEntitiesRes[0].name.should.be.eql(d1.name)
       JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.be.eql(f1.shortid)
+      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
       templatesRes[0].name.should.be.eql(t1.name)
       templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.be.eql(f1.shortid)
+      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity insert when both _id and humanReadableKey conflict on different folder level (import on root)', async () => {
@@ -873,13 +873,13 @@ module.exports = (getReporter) => {
 
       dataEntitiesRes.should.matchAny((d) => (
         d.name.should.be.eql('data') &&
-        d.folder.shortid.be.eql(f1.shortid) &&
+        d.folder.shortid.should.be.eql(f1.shortid) &&
         JSON.parse(d.dataJson).a.should.be.eql('a')
       ))
 
       dataEntitiesRes.should.matchAny((d) => (
         d.name.should.be.eql('data2') &&
-        should(d.folder).should.be.not.ok() &&
+        should(d.folder).be.not.ok() &&
         JSON.parse(d.dataJson).a.should.be.eql('b')
       ))
 
@@ -1279,10 +1279,10 @@ module.exports = (getReporter) => {
       dataEntitiesRes[0].name.should.be.eql('data')
       dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
       JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.be.eql(f1.shortid)
+      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
       templatesRes[0].name.should.be.eql('foo')
       templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.be.eql(f1.shortid)
+      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update when humanReadableKey conflict on different folder level (import on root)', async () => {
@@ -1687,10 +1687,10 @@ module.exports = (getReporter) => {
       dataEntitiesRes[0]._id.should.be.eql(d1._id)
       dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
       JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.be.eql(f1.shortid)
+      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
       templatesRes[0].name.should.be.eql('foo')
       templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.be.eql(f1.shortid)
+      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on different folder level (import on root)', async () => {
