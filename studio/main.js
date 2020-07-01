@@ -88,13 +88,13 @@
 /* 0 */
 /***/ (function(module, exports) {
 
-module.exports = Studio;
+module.exports = Studio.libraries['react'];
 
 /***/ }),
 /* 1 */
 /***/ (function(module, exports) {
 
-module.exports = Studio.libraries['react'];
+module.exports = Studio;
 
 /***/ }),
 /* 2 */
@@ -111,7 +111,7 @@ var _ImportModal = __webpack_require__(5);
 
 var _ImportModal2 = _interopRequireDefault(_ImportModal);
 
-var _jsreportStudio = __webpack_require__(0);
+var _jsreportStudio = __webpack_require__(1);
 
 var _jsreportStudio2 = _interopRequireDefault(_jsreportStudio);
 
@@ -257,11 +257,11 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(1);
+var _react = __webpack_require__(0);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _jsreportStudio = __webpack_require__(0);
+var _jsreportStudio = __webpack_require__(1);
 
 var _jsreportStudio2 = _interopRequireDefault(_jsreportStudio);
 
@@ -479,11 +479,15 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(1);
+var _react = __webpack_require__(0);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _jsreportStudio = __webpack_require__(0);
+var _FileInput = __webpack_require__(6);
+
+var _FileInput2 = _interopRequireDefault(_FileInput);
+
+var _jsreportStudio = __webpack_require__(1);
 
 var _jsreportStudio2 = _interopRequireDefault(_jsreportStudio);
 
@@ -602,100 +606,126 @@ var ImportModal = function (_Component2) {
     _this4.state = {
       selectedFolderShortid: props.options != null && props.options.selectedFolderShortid ? props.options.selectedFolderShortid : null,
       fullImport: false,
-      continueOnFail: false,
+      retryWithContinueOnFail: false,
       validated: false
     };
 
     if (props.options && props.options.selectedFile) {
-      _this4.upload(props.options.selectedFile);
+      _this4.state.selectedFile = props.options.selectedFile;
     }
+
+    _this4.handleImportModeChange = _this4.handleImportModeChange.bind(_this4);
     return _this4;
   }
 
   _createClass(ImportModal, [{
-    key: 'upload',
-    value: function upload(file) {
-      var _this5 = this;
-
-      if (!file) {
+    key: 'handleImportModeChange',
+    value: function handleImportModeChange(ev) {
+      if (this.state.processing === true || this.state.validated) {
         return;
       }
 
+      var fullImport = false;
+
+      if (ev.target.value === 'full') {
+        fullImport = true;
+      }
+
       this.setState({
-        status: '1',
-        processing: true,
-        log: 'Validating import....'
+        fullImport: fullImport
       });
-
-      this.file = file;
-      var reader = new FileReader();
-
-      reader.onloadend = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
+    }
+  }, {
+    key: 'validate',
+    value: function () {
+      var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(file) {
         var result;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
               case 0:
-                _this5.refs.file.value = '';
+                if (!(!file || this.state.processing)) {
+                  _context.next = 2;
+                  break;
+                }
 
-                _context.prev = 1;
-                _context.next = 4;
+                return _context.abrupt('return');
+
+              case 2:
+
+                this.setState({
+                  status: '1',
+                  processing: true,
+                  log: 'Validating import....'
+                });
+
+                _context.prev = 3;
+                _context.next = 6;
                 return _jsreportStudio2.default.api.post('api/validate-import', {
                   params: {
-                    fullImport: _this5.state.fullImport,
-                    targetFolder: _this5.state.selectedFolderShortid
+                    fullImport: this.state.fullImport,
+                    targetFolder: this.state.selectedFolderShortid
                   },
-                  attach: { filename: 'import.zip', file: _this5.file }
+                  attach: { filename: 'import.zip', file: file }
                 }, true);
 
-              case 4:
+              case 6:
                 result = _context.sent;
 
 
-                _this5.setState({
+                this.setState({
                   validated: true,
                   status: result.status,
                   processing: false,
                   log: result.log
                 });
-                _context.next = 11;
+                _context.next = 13;
                 break;
 
-              case 8:
-                _context.prev = 8;
-                _context.t0 = _context['catch'](1);
+              case 10:
+                _context.prev = 10;
+                _context.t0 = _context['catch'](3);
 
-                _this5.setState({
+                this.setState({
                   validated: true,
                   status: '1',
                   processing: false,
                   log: _context.t0.message + ' ' + _context.t0.stack
                 });
 
-              case 11:
+              case 13:
               case 'end':
                 return _context.stop();
             }
           }
-        }, _callee, _this5, [[1, 8]]);
+        }, _callee, this, [[3, 10]]);
       }));
 
-      reader.onerror = function () {
-        alert('There was an error reading the file!');
-      };
+      function validate(_x) {
+        return _ref.apply(this, arguments);
+      }
 
-      reader.readAsArrayBuffer(this.file);
-    }
+      return validate;
+    }()
   }, {
     key: 'import',
     value: function () {
       var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
-        var result;
+        var retryWithContinueOnFail, result, stateToUpdate;
         return regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
               case 0:
-                _context2.prev = 0;
+                if (!this.state.processing) {
+                  _context2.next = 2;
+                  break;
+                }
+
+                return _context2.abrupt('return');
+
+              case 2:
+                retryWithContinueOnFail = this.state.retryWithContinueOnFail;
+                _context2.prev = 3;
 
                 this.setState({
                   status: '1',
@@ -703,42 +733,55 @@ var ImportModal = function (_Component2) {
                   log: 'Working on import....'
                 });
 
-                _context2.next = 4;
+                _context2.next = 7;
                 return _jsreportStudio2.default.api.post('api/import', {
                   params: {
                     fullImport: this.state.fullImport,
-                    continueOnFail: this.state.continueOnFail,
+                    continueOnFail: retryWithContinueOnFail,
                     targetFolder: this.state.selectedFolderShortid
                   },
-                  attach: { filename: 'import.zip', file: this.file }
+                  attach: { filename: 'import.zip', file: this.state.selectedFile }
                 }, true);
 
-              case 4:
+              case 7:
                 result = _context2.sent;
 
+
+                this.setState({
+                  processing: false,
+                  retryWithContinueOnFail: false
+                });
 
                 _jsreportStudio2.default.openModal(ImportFinishedModal, {
                   log: result.log
                 });
-                _context2.next = 11;
+                _context2.next = 17;
                 break;
 
-              case 8:
-                _context2.prev = 8;
-                _context2.t0 = _context2['catch'](0);
-
-                this.setState({
+              case 12:
+                _context2.prev = 12;
+                _context2.t0 = _context2['catch'](3);
+                stateToUpdate = {
                   status: '1',
                   processing: false,
                   log: _context2.t0.message + ' ' + _context2.t0.stack
-                });
+                };
 
-              case 11:
+
+                if (!retryWithContinueOnFail && _context2.t0.canContinueAfterFail) {
+                  stateToUpdate.retryWithContinueOnFail = true;
+                } else {
+                  stateToUpdate.retryWithContinueOnFail = false;
+                }
+
+                this.setState(stateToUpdate);
+
+              case 17:
               case 'end':
                 return _context2.stop();
             }
           }
-        }, _callee2, this, [[0, 8]]);
+        }, _callee2, this, [[3, 12]]);
       }));
 
       function _import() {
@@ -751,39 +794,20 @@ var ImportModal = function (_Component2) {
     key: 'cancel',
     value: function cancel() {
       this.setState({
+        status: null,
+        log: null,
+        retryWithContinueOnFail: false,
         validated: false
       });
     }
   }, {
-    key: 'openFileDialog',
-    value: function openFileDialog() {
-      this.refs.file.dispatchEvent(new MouseEvent('click', {
-        'view': window,
-        'bubbles': false,
-        'cancelable': true
-      }));
-    }
-  }, {
     key: 'render',
     value: function render() {
-      var _this6 = this;
+      var _this5 = this;
 
       return _react2.default.createElement(
         'div',
         null,
-        _react2.default.createElement('input', {
-          type: 'file',
-          key: 'file',
-          ref: 'file',
-          style: { display: 'none' },
-          onChange: function onChange(e) {
-            if (!e.target.files.length) {
-              return;
-            }
-
-            _this6.upload(e.target.files[0]);
-          }
-        }),
         _react2.default.createElement(
           'h1',
           null,
@@ -814,142 +838,155 @@ var ImportModal = function (_Component2) {
         _react2.default.createElement(
           'div',
           { className: 'form-group' },
-          _react2.default.createElement(
-            'div',
-            null,
-            _react2.default.createElement(
-              'label',
-              { style: { opacity: this.state.processing === true || this.state.validated ? 0.7 : 1 } },
-              _react2.default.createElement('input', {
-                type: 'checkbox',
-                style: { verticalAlign: 'middle' },
-                disabled: this.state.processing === true || this.state.validated,
-                onChange: function onChange(e) {
-                  _this6.setState({
-                    fullImport: e.target.checked
-                  });
-                }
-              }),
-              _react2.default.createElement(
-                'span',
-                { style: { verticalAlign: 'middle' } },
-                'Full Import'
-              )
-            )
-          ),
-          this.state.fullImport && _react2.default.createElement(
-            'p',
-            { style: { marginTop: '10px' } },
-            'A ',
-            _react2.default.createElement(
-              'b',
-              null,
-              'full import'
-            ),
-            ' means that ',
-            _react2.default.createElement(
-              'b',
-              null,
-              'all the entities that are not present in the zip will be deleted'
-            ),
-            ', after the import ',
-            _react2.default.createElement(
-              'b',
-              null,
-              'you will have only the entities that were present in the zip'
-            ),
-            '.'
-          )
+          _react2.default.createElement(_FileInput2.default, {
+            placeholder: 'select import zip file...',
+            selectedFile: this.state.selectedFile,
+            onFileSelect: function onFileSelect(file) {
+              return _this5.setState({ selectedFile: file });
+            },
+            disabled: this.state.processing === true || this.state.validated
+          })
         ),
         _react2.default.createElement(
           'div',
           { className: 'form-group' },
           _react2.default.createElement(
-            'div',
-            { style: {
-                display: !this.state.fullImport ? 'block' : 'none',
-                border: '1px dashed black',
-                padding: '0.6rem',
-                opacity: this.state.processing === true || this.state.validated ? 0.7 : 1
-              } },
+            'fieldset',
+            { style: { padding: '0px', margin: '0px', borderWidth: '1px' } },
             _react2.default.createElement(
-              'label',
-              null,
-              'You can ',
-              _react2.default.createElement(
-                'b',
-                null,
-                'optionally'
-              ),
-              ' select a folder in which the entities  will be inserted'
+              'legend',
+              { style: { marginLeft: '0.2rem' } },
+              'Options'
             ),
-            _react2.default.createElement(EntityRefSelect, {
-              noModal: true,
-              allowNewFolder: true,
-              treeStyle: { height: '12rem' },
-              headingLabel: 'Select folder',
-              filter: function filter(references) {
-                return { folders: references.folders };
-              },
-              selectableFilter: function selectableFilter(isGroup, entity) {
-                return entity.__entitySet === 'folders';
-              },
-              value: this.state.selectedFolderShortid,
-              disabled: this.state.processing === true || this.state.validated,
-              onChange: function onChange(selected) {
-                _this6.setState({
-                  selectedFolderShortid: selected.length > 0 ? selected[0].shortid : null
-                });
-              }
-            })
-          ),
-          _react2.default.createElement(
-            'div',
-            null,
             _react2.default.createElement(
-              'label',
-              { style: { opacity: this.state.processing === true || this.state.validated ? 0.7 : 1 } },
-              _react2.default.createElement('input', {
-                type: 'checkbox',
-                style: { verticalAlign: 'middle' },
-                disabled: this.state.processing === true || this.state.validated,
-                onChange: function onChange(e) {
-                  _this6.setState({
-                    continueOnFail: e.target.checked
-                  });
-                }
-              }),
+              'div',
+              { className: 'form-group' },
               _react2.default.createElement(
-                'span',
-                { style: { verticalAlign: 'middle' } },
-                'Continue import on fail'
+                'div',
+                { style: { opacity: this.state.processing === true || this.state.validated ? 0.7 : 1 } },
+                _react2.default.createElement(
+                  'label',
+                  null,
+                  _react2.default.createElement('input', {
+                    type: 'radio',
+                    name: 'import-mode',
+                    value: 'merge',
+                    style: { verticalAlign: 'middle', margin: '0px' },
+                    checked: !this.state.fullImport,
+                    onChange: this.handleImportModeChange
+                  }),
+                  _react2.default.createElement(
+                    'span',
+                    { style: { display: 'inline-block', verticalAlign: 'middle', paddingLeft: '0.2rem', paddingRight: '0.5rem' } },
+                    'Merge'
+                  )
+                ),
+                _react2.default.createElement(
+                  'label',
+                  null,
+                  _react2.default.createElement('input', {
+                    type: 'radio',
+                    name: 'import-mode',
+                    value: 'full',
+                    style: { verticalAlign: 'middle', margin: '0px' },
+                    checked: this.state.fullImport,
+                    onChange: this.handleImportModeChange
+                  }),
+                  _react2.default.createElement(
+                    'span',
+                    { style: { display: 'inline-block', verticalAlign: 'middle', paddingLeft: '0.2rem', paddingRight: '0.5rem' } },
+                    'Full'
+                  )
+                )
               )
             ),
-            this.state.continueOnFail && _react2.default.createElement(
-              'p',
-              { style: { marginTop: '10px' } },
+            _react2.default.createElement(
+              'div',
+              { className: 'form-group' },
               _react2.default.createElement(
-                'b',
-                null,
-                'Continue import on fail'
+                'div',
+                { style: {
+                    display: !this.state.fullImport ? 'block' : 'none',
+                    border: '1px dashed black',
+                    padding: '0.6rem',
+                    opacity: this.state.processing === true || this.state.validated ? 0.7 : 1
+                  } },
+                _react2.default.createElement(
+                  'label',
+                  { style: { display: 'inline-block', marginBottom: '5px' } },
+                  _react2.default.createElement(
+                    'b',
+                    null,
+                    'Optionally'
+                  ),
+                  ' you can select a folder in which the entities  will be inserted'
+                ),
+                _react2.default.createElement(
+                  'div',
+                  { style: { maxHeight: '20rem', overflow: 'auto' } },
+                  _react2.default.createElement(EntityRefSelect, {
+                    noModal: true,
+                    allowNewFolder: true,
+                    treeStyle: { minHeight: 'auto', maxHeight: 'none' },
+                    headingLabel: 'Select folder',
+                    filter: function filter(references) {
+                      return { folders: references.folders };
+                    },
+                    selectableFilter: function selectableFilter(isGroup, entity) {
+                      return entity.__entitySet === 'folders';
+                    },
+                    value: this.state.selectedFolderShortid,
+                    disabled: this.state.processing === true || this.state.validated,
+                    onChange: function onChange(selected) {
+                      _this5.setState({
+                        selectedFolderShortid: selected.length > 0 ? selected[0].shortid : null
+                      });
+                    }
+                  })
+                )
               ),
-              ' means that ',
-              _react2.default.createElement(
-                'b',
-                null,
-                'the import will try to process all the entities in the zip, even if there is some of them that causes conflicts'
-              ),
-              ', import is transactional operation by default but when this option is enabled it allows the importing to ignore some errors and continue processing.'
+              this.state.fullImport && _react2.default.createElement(
+                'p',
+                { style: { marginTop: '10px' } },
+                'A ',
+                _react2.default.createElement(
+                  'b',
+                  null,
+                  'full import'
+                ),
+                ' means that ',
+                _react2.default.createElement(
+                  'b',
+                  null,
+                  'all the entities that are not present in the zip will be deleted'
+                ),
+                ', after the import ',
+                _react2.default.createElement(
+                  'b',
+                  null,
+                  'you will have only the entities that were present in the zip'
+                ),
+                '.'
+              )
             )
-          ),
+          )
+        ),
+        _react2.default.createElement(
+          'div',
+          { className: 'form-group' },
           !this.state.validated && _react2.default.createElement(
             'div',
             { className: 'button-bar' },
             _react2.default.createElement(
-              'a',
-              { className: 'button confirmation', onClick: function onClick() {
-                  return _this6.openFileDialog();
-                } },
+              'button',
+              {
+                className: 'button confirmation',
+                style: { opacity: this.state.selectedFile == null ? 0.7 : 1 },
+                disabled: this.state.selectedFile == null,
+                onClick: function onClick() {
+                  return _this5.validate(_this5.state.selectedFile);
+                }
+              },
               'Validate'
             )
           ),
@@ -968,22 +1005,22 @@ var ImportModal = function (_Component2) {
             ),
             _react2.default.createElement('textarea', { style: { width: '100%', boxSizing: 'border-box' }, rows: '10', readOnly: true, value: this.state.log })
           ),
-          this.state.validated && this.state.status === '0' && _react2.default.createElement(
+          this.state.validated && _react2.default.createElement(
             'div',
             { className: 'button-bar' },
             _react2.default.createElement(
-              'a',
+              'button',
               { className: 'button danger', onClick: function onClick() {
-                  return _this6.cancel();
+                  return _this5.cancel();
                 } },
               'Cancel'
             ),
-            _react2.default.createElement(
-              'a',
+            (this.state.status === '0' || this.state.retryWithContinueOnFail) && _react2.default.createElement(
+              'button',
               { className: 'button confirmation', onClick: function onClick() {
-                  return _this6.import();
+                  return _this5.import();
                 } },
-              'Import'
+              this.state.retryWithContinueOnFail ? 'Ignore errors and continue' : 'Import'
             )
           )
         )
@@ -996,6 +1033,120 @@ var ImportModal = function (_Component2) {
 
 exports.default = ImportModal;
 
+/***/ }),
+/* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _react = __webpack_require__(0);
+
+var _react2 = _interopRequireDefault(_react);
+
+var _FileInput = __webpack_require__(7);
+
+var _FileInput2 = _interopRequireDefault(_FileInput);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var FileInput = function (_Component) {
+  _inherits(FileInput, _Component);
+
+  function FileInput(props) {
+    _classCallCheck(this, FileInput);
+
+    var _this = _possibleConstructorReturn(this, (FileInput.__proto__ || Object.getPrototypeOf(FileInput)).call(this, props));
+
+    _this.state = {};
+    return _this;
+  }
+
+  _createClass(FileInput, [{
+    key: 'handleOpen',
+    value: function handleOpen() {
+      this.refs.file.dispatchEvent(new MouseEvent('click', {
+        'view': window,
+        'bubbles': false,
+        'cancelable': true
+      }));
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      var _this2 = this;
+
+      var _props = this.props,
+          placeholder = _props.placeholder,
+          selectedFile = _props.selectedFile,
+          onFileSelect = _props.onFileSelect,
+          disabled = _props.disabled;
+
+
+      var placeholderText = void 0;
+
+      if (placeholder) {
+        placeholderText = placeholder;
+      } else {
+        placeholderText = 'select file...';
+      }
+
+      return _react2.default.createElement(
+        'div',
+        {
+          className: _FileInput2.default.selectInput, onClick: function onClick() {
+            return !disabled && _this2.handleOpen();
+          },
+          style: { opacity: disabled ? 0.7 : 1 }
+        },
+        _react2.default.createElement('i', { className: 'fa fa-upload' }),
+        _react2.default.createElement(
+          'span',
+          {
+            title: placeholderText,
+            className: _FileInput2.default.nameLabel,
+            onClick: function onClick(e) {
+              e.preventDefault();
+              e.stopPropagation();
+
+              if (!disabled) {
+                _this2.handleOpen();
+              }
+            }
+          },
+          selectedFile ? selectedFile.name : placeholderText
+        ),
+        _react2.default.createElement('input', {
+          type: 'file',
+          key: 'file',
+          ref: 'file',
+          style: { display: 'none' },
+          onChange: function onChange(e) {
+            if (!e.target.files.length) {
+              return;
+            }
+
+            onFileSelect(e.target.files[0]);
+          }
+        })
+      );
+    }
+  }]);
+
+  return FileInput;
+}(_react.Component);
 
 (function (window) {
   try {
@@ -1019,6 +1170,15 @@ exports.default = ImportModal;
 
   window.MouseEvent = MouseEvent;
 })(window);
+
+exports.default = FileInput;
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// extracted by mini-css-extract-plugin
+module.exports = {"selectInput":"x-import-export-FileInput-selectInput","link":"x-import-export-FileInput-link","nameLabel":"x-import-export-FileInput-nameLabel"};
 
 /***/ })
 /******/ ]);

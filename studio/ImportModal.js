@@ -1,4 +1,5 @@
 import React, {Component} from 'react'
+import FileInput from './FileInput'
 import Studio from 'jsreport-studio'
 
 const EntityRefSelect = Studio.EntityRefSelect
@@ -45,24 +46,42 @@ class ImportFinishedModal extends Component {
   }
 }
 
-export default class ImportModal extends Component {
+class ImportModal extends Component {
   constructor (props) {
     super(props)
 
     this.state = {
       selectedFolderShortid: props.options != null && props.options.selectedFolderShortid ? props.options.selectedFolderShortid : null,
       fullImport: false,
-      continueOnFail: false,
+      retryWithContinueOnFail: false,
       validated: false
     }
 
     if (props.options && props.options.selectedFile) {
-      this.upload(props.options.selectedFile)
+      this.state.selectedFile = props.options.selectedFile
     }
+
+    this.handleImportModeChange = this.handleImportModeChange.bind(this)
   }
 
-  upload (file) {
-    if (!file) {
+  handleImportModeChange (ev) {
+    if (this.state.processing === true || this.state.validated) {
+      return
+    }
+
+    let fullImport = false
+
+    if (ev.target.value === 'full') {
+      fullImport = true
+    }
+
+    this.setState({
+      fullImport
+    })
+  }
+
+  async validate (file) {
+    if (!file || this.state.processing) {
       return
     }
 
@@ -72,45 +91,38 @@ export default class ImportModal extends Component {
       log: 'Validating import....'
     })
 
-    this.file = file
-    const reader = new FileReader()
+    try {
+      const result = await Studio.api.post('api/validate-import', {
+        params: {
+          fullImport: this.state.fullImport,
+          targetFolder: this.state.selectedFolderShortid
+        },
+        attach: { filename: 'import.zip', file }
+      }, true)
 
-    reader.onloadend = async () => {
-      this.refs.file.value = ''
-
-      try {
-        const result = await Studio.api.post('api/validate-import', {
-          params: {
-            fullImport: this.state.fullImport,
-            targetFolder: this.state.selectedFolderShortid
-          },
-          attach: { filename: 'import.zip', file: this.file }
-        }, true)
-
-        this.setState({
-          validated: true,
-          status: result.status,
-          processing: false,
-          log: result.log
-        })
-      } catch (e) {
-        this.setState({
-          validated: true,
-          status: '1',
-          processing: false,
-          log: e.message + ' ' + e.stack
-        })
-      }
+      this.setState({
+        validated: true,
+        status: result.status,
+        processing: false,
+        log: result.log
+      })
+    } catch (e) {
+      this.setState({
+        validated: true,
+        status: '1',
+        processing: false,
+        log: e.message + ' ' + e.stack
+      })
     }
-
-    reader.onerror = function () {
-      alert('There was an error reading the file!')
-    }
-
-    reader.readAsArrayBuffer(this.file)
   }
 
   async import () {
+    if (this.state.processing) {
+      return
+    }
+
+    const { retryWithContinueOnFail } = this.state
+
     try {
       this.setState({
         status: '1',
@@ -121,133 +133,139 @@ export default class ImportModal extends Component {
       const result = await Studio.api.post('api/import', {
         params: {
           fullImport: this.state.fullImport,
-          continueOnFail: this.state.continueOnFail,
+          continueOnFail: retryWithContinueOnFail,
           targetFolder: this.state.selectedFolderShortid
         },
-        attach: { filename: 'import.zip', file: this.file }
+        attach: { filename: 'import.zip', file: this.state.selectedFile }
       }, true)
+
+      this.setState({
+        processing: false,
+        retryWithContinueOnFail: false
+      })
 
       Studio.openModal(ImportFinishedModal, {
         log: result.log
       })
     } catch (e) {
-      this.setState({
+      const stateToUpdate = {
         status: '1',
         processing: false,
         log: e.message + ' ' + e.stack
-      })
+      }
+
+      if (!retryWithContinueOnFail && e.canContinueAfterFail) {
+        stateToUpdate.retryWithContinueOnFail = true
+      } else {
+        stateToUpdate.retryWithContinueOnFail = false
+      }
+
+      this.setState(stateToUpdate)
     }
   }
 
   cancel () {
     this.setState({
+      status: null,
+      log: null,
+      retryWithContinueOnFail: false,
       validated: false
     })
-  }
-
-  openFileDialog () {
-    this.refs.file.dispatchEvent(new MouseEvent('click', {
-      'view': window,
-      'bubbles': false,
-      'cancelable': true
-    }))
   }
 
   render () {
     return (
       <div>
-        <input
-          type='file'
-          key='file'
-          ref='file'
-          style={{display: 'none'}}
-          onChange={(e) => {
-            if (!e.target.files.length) {
-              return
-            }
-
-            this.upload(e.target.files[0])
-          }}
-        />
-
         <h1><i className='fa fa-upload' /> Import objects</h1>
-
         <div className='form-group'>
           <p>
             A <b>validation is run first</b>, so you can safely upload the exported package and review the changes which will be performed. Afterwards <b>you can confirm or cancel the import</b>.
           </p>
         </div>
         <div className='form-group'>
-          <div>
-            <label style={{ opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1 }}>
-              <input
-                type='checkbox'
-                style={{ verticalAlign: 'middle' }}
-                disabled={this.state.processing === true || this.state.validated}
-                onChange={(e) => {
-                  this.setState({
-                    fullImport: e.target.checked
-                  })
-                }}
-              />
-              <span style={{ verticalAlign: 'middle' }}>Full Import</span>
-            </label>
-          </div>
-          {this.state.fullImport && (
-            <p style={{ marginTop: '10px' }}>
-              A <b>full import</b> means that <b>all the entities that are not present in the zip will be deleted</b>, after the import <b>you will have only the entities that were present in the zip</b>.
-            </p>
-          )}
+          <FileInput
+            placeholder='select import zip file...'
+            selectedFile={this.state.selectedFile}
+            onFileSelect={(file) => this.setState({ selectedFile: file })}
+            disabled={this.state.processing === true || this.state.validated}
+          />
         </div>
         <div className='form-group'>
-          <div style={{
-            display: !this.state.fullImport ? 'block' : 'none',
-            border: '1px dashed black',
-            padding: '0.6rem',
-            opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1
-          }}>
-            <label>You can <b>optionally</b> select a folder in which the entities  will be inserted</label>
-            <EntityRefSelect
-              noModal
-              allowNewFolder
-              treeStyle={{ height: '12rem' }}
-              headingLabel='Select folder'
-              filter={(references) => ({ folders: references.folders })}
-              selectableFilter={(isGroup, entity) => entity.__entitySet === 'folders'}
-              value={this.state.selectedFolderShortid}
-              disabled={this.state.processing === true || this.state.validated}
-              onChange={(selected) => {
-                this.setState({
-                  selectedFolderShortid: selected.length > 0 ? selected[0].shortid : null
-                })
-              }}
-            />
-          </div>
-          <div>
-            <label style={{ opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1 }}>
-              <input
-                type='checkbox'
-                style={{ verticalAlign: 'middle' }}
-                disabled={this.state.processing === true || this.state.validated}
-                onChange={(e) => {
-                  this.setState({
-                    continueOnFail: e.target.checked
-                  })
-                }}
-              />
-              <span style={{ verticalAlign: 'middle' }}>Continue import on fail</span>
-            </label>
-            {this.state.continueOnFail && (
-              <p style={{ marginTop: '10px' }}>
-                <b>Continue import on fail</b> means that <b>the import will try to process all the entities in the zip, even if there is some of them that causes conflicts</b>, import is transactional operation by default but when this option is enabled it allows the importing to ignore some errors and continue processing.
-              </p>
-            )}
-          </div>
+          <fieldset style={{ padding: '0px', margin: '0px', borderWidth: '1px' }}>
+            <legend style={{ marginLeft: '0.2rem' }}>Options</legend>
+            <div className='form-group'>
+              <div style={{ opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1 }}>
+                <label>
+                  <input
+                    type='radio'
+                    name='import-mode'
+                    value='merge'
+                    style={{ verticalAlign: 'middle', margin: '0px' }}
+                    checked={!this.state.fullImport}
+                    onChange={this.handleImportModeChange}
+                  />
+                  <span style={{ display: 'inline-block', verticalAlign: 'middle', paddingLeft: '0.2rem', paddingRight: '0.5rem' }}>Merge</span>
+                </label>
+                <label>
+                  <input
+                    type='radio'
+                    name='import-mode'
+                    value='full'
+                    style={{ verticalAlign: 'middle', margin: '0px' }}
+                    checked={this.state.fullImport}
+                    onChange={this.handleImportModeChange}
+                  />
+                  <span style={{ display: 'inline-block', verticalAlign: 'middle', paddingLeft: '0.2rem', paddingRight: '0.5rem' }}>Full</span>
+                </label>
+              </div>
+            </div>
+            <div className='form-group'>
+              <div style={{
+                display: !this.state.fullImport ? 'block' : 'none',
+                border: '1px dashed black',
+                padding: '0.6rem',
+                opacity: (this.state.processing === true || this.state.validated) ? 0.7 : 1
+              }}>
+                <label style={{ display: 'inline-block', marginBottom: '5px' }}>
+                  <b>Optionally</b> you can select a folder in which the entities  will be inserted
+                </label>
+                <div style={{ maxHeight: '20rem', overflow: 'auto' }}>
+                  <EntityRefSelect
+                    noModal
+                    allowNewFolder
+                    treeStyle={{ minHeight: 'auto', maxHeight: 'none' }}
+                    headingLabel='Select folder'
+                    filter={(references) => ({ folders: references.folders })}
+                    selectableFilter={(isGroup, entity) => entity.__entitySet === 'folders'}
+                    value={this.state.selectedFolderShortid}
+                    disabled={this.state.processing === true || this.state.validated}
+                    onChange={(selected) => {
+                      this.setState({
+                        selectedFolderShortid: selected.length > 0 ? selected[0].shortid : null
+                      })
+                    }}
+                  />
+                </div>
+              </div>
+              {this.state.fullImport && (
+                <p style={{ marginTop: '10px' }}>
+                  A <b>full import</b> means that <b>all the entities that are not present in the zip will be deleted</b>, after the import <b>you will have only the entities that were present in the zip</b>.
+                </p>
+              )}
+            </div>
+          </fieldset>
+        </div>
+        <div className='form-group'>
           {!this.state.validated && (
             <div className='button-bar'>
-              <a className='button confirmation' onClick={() => this.openFileDialog()}>
+              <button
+                className='button confirmation'
+                style={{ opacity: this.state.selectedFile == null ? 0.7 : 1 }}
+                disabled={this.state.selectedFile == null}
+                onClick={() => this.validate(this.state.selectedFile)}
+              >
                 Validate
-              </a>
+              </button>
             </div>
           )}
           <br />
@@ -259,14 +277,16 @@ export default class ImportModal extends Component {
               <textarea style={{width: '100%', boxSizing: 'border-box'}} rows='10' readOnly value={this.state.log} />
             </div>
           )}
-          {this.state.validated && this.state.status === '0' && (
+          {this.state.validated && (
             <div className='button-bar'>
-              <a className='button danger' onClick={() => this.cancel()}>
+              <button className='button danger' onClick={() => this.cancel()}>
                 Cancel
-              </a>
-              <a className='button confirmation' onClick={() => this.import()}>
-                Import
-              </a>
+              </button>
+              {(this.state.status === '0' || this.state.retryWithContinueOnFail) && (
+                <button className='button confirmation' onClick={() => this.import()}>
+                  {this.state.retryWithContinueOnFail ? 'Ignore errors and continue' : 'Import'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -275,25 +295,4 @@ export default class ImportModal extends Component {
   }
 }
 
-(function (window) {
-  try {
-    new MouseEvent('test')  // eslint-disable-line
-    return false // No need to polyfill
-  } catch (e) {
-    // Need to polyfill - fall through
-  }
-
-  // Polyfills DOM4 MouseEvent
-
-  var MouseEvent = function (eventType, params) {
-    params = params || { bubbles: false, cancelable: false }
-    var mouseEvent = document.createEvent('MouseEvent')
-    mouseEvent.initMouseEvent(eventType, params.bubbles, params.cancelable, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
-
-    return mouseEvent
-  }
-
-  MouseEvent.prototype = Event.prototype
-
-  window.MouseEvent = MouseEvent
-})(window)
+export default ImportModal
