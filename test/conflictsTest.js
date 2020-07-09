@@ -1,3146 +1,1411 @@
-const should = require('should')
-const saveExportStream = require('./saveExportStream')
+const conflictsUtils = require('./conflictsUtils')
 
 module.exports = (getReporter) => {
   let reporter
+  let exportEntities
+  let importEntities
+  let assertExists
 
   beforeEach(() => {
     reporter = getReporter()
+    const manager = conflictsUtils(reporter)
+    exportEntities = manager.exportEntities
+    importEntities = manager.importEntities
+    assertExists = manager.assertExists
   })
 
   describe('when no entity path conflict', () => {
     it('should produce entity insert when _id conflict on same folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        shortid: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        't2', { _id: 't1' }
+      )
+
+      await assertExists('t1', 't2', (entities) => {
+        const templates = entities.templates
+        templates[0]._id.should.be.not.eql(templates[1]._id)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: 'bar',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo'))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar'))
     })
 
     it('should produce entity insert when _id conflict on same folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        shortid: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/t2', { _id: 't1' }
+      )
+
+      await assertExists('f1/t1', 'f1/t2', (entities) => {
+        const templates = entities.templates
+        templates[0]._id.should.be.not.eql(templates[1]._id)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
     })
 
     it('should produce entity insert when _id conflict on different folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        shortid: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'f1',
+        'f1/t2', { _id: 't1' }
+      )
+
+      await assertExists('t1', 'f1/t2', (entities) => {
+        const templates = entities.templates
+        templates[0]._id.should.be.not.eql(templates[1]._id)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && should(t.folder).be.not.ok())
     })
 
     it('should produce entity insert when _id conflict on different folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        shortid: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        `t2`, { _id: 't1' },
+        'f1'
+      )
+
+      await assertExists('t2', 'f1/t1', (entities) => {
+        const templates = entities.templates
+        templates[0]._id.should.be.not.eql(templates[1]._id)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: 'bar',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && should(t.folder).be.not.ok())
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.folder.shortid.should.be.eql(f1.shortid))
     })
 
     it('should produce entity update when humanReadableKey conflict on same folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        't2', { shortid: 't1' }
+      )
+
+      await assertExists('t1', (entities) => {
+        const templates = entities.templates
+        templates.should.have.length(1)
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
     })
 
     it('should produce entity update when humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/t2', { shortid: 't1' }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const templates = entities.templates
+        templates.should.have.length(1)
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update and keep references when humanReadableKey conflict on same folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'd2', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('t1', 'd1', (entities) => {
+        const { templates, data } = entities
+        templates.should.have.length(1)
+        data.should.have.length(1)
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].name.should.be.eql('data')
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
     })
 
     it('should produce entity update and keep references when humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d2', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('f1/d1', 'f1/t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].name.should.be.eql('data')
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity insert when humanReadableKey conflict on different folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'f1',
+        'f1/t2', { shortid: 't1' }
+      )
+
+      await assertExists('t1', 'f1/t2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && should(t.folder).be.not.ok())
     })
 
     it('should produce entity insert when humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        't2', { shortid: 't1' },
+        'f1'
+      )
+
+      await assertExists('t2', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && should(t.folder).be.not.ok())
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.folder.shortid.should.be.eql(f1.shortid))
     })
 
     it('should produce entity insert and updated references when humanReadableKey conflict on different folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'f1',
+        'f1/d2', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('t1', 'd1', 'f1/d2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity insert and updated references when humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'd2', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d2', 'f1/d1', 'f1/t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on same folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities('t2', { _id: 't1', shortid: 't1' })
+
+      await assertExists('t1', (entities) => {
+        const { templates } = entities
+        templates.should.have.length(1)
+        templates[0]._id.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].name.should.be.eql(t1.name)
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/t2', { _id: 't1', shortid: 't1' }
+      )
+
+      await assertExists('f1', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(1)
+        templates[0]._id.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].name.should.be.eql(t1.name)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update and keep references when both _id and humanReadableKey conflict on same folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities('d2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` })
+
+      await assertExists('d1', 't1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0]._id.should.be.eql('d1')
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.be.eql(d1._id)
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      dataEntitiesRes[0].name.should.be.eql(d1.name)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
     })
 
     it('should produce entity update and keep references when both _id and humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('f1/d1', 'f1/t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0]._id.should.be.eql('d1')
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.be.eql(d1._id)
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      dataEntitiesRes[0].name.should.be.eql(d1.name)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
-      templatesRes[0].name.should.be.eql(t1.name)
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity insert when both _id and humanReadableKey conflict on different folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'f1',
+        'f1/t2', { _id: 't1', shortid: 't1' }
+      )
+
+      await assertExists('t1', 'f1/t2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0]._id.should.be.not.eql(templates[1]._id)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t._id.should.be.eql(t1._id) && t.shortid.should.be.eql(t1.shortid) && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && should(t.folder).be.not.ok())
     })
 
     it('should produce entity insert when both _id and humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        't2', { _id: 't1', shortid: 't1' }
+      )
+
+      await assertExists('t2', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0]._id.should.be.not.eql(templates[1]._id)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && should(t.folder).be.not.ok())
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.folder.shortid.should.be.eql(f1.shortid))
     })
 
     it('should produce entity insert and updated references when both _id and humanReadableKey conflict on different folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'f1',
+        'f1/d2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d1', 't1', 'f1/d2', (entities) => {
+        const { templates, data } = entities
+
+        data.should.have.length(2)
+        templates.should.have.length(1)
+
+        data[0]._id.should.not.be.eql(data[1]._id)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.not.be.eql(dataEntitiesRes[1]._id)
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity insert and updated references when both _id and humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'd2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d2', 'f1/t1', 'f1/d1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+
+        data[0]._id.should.not.be.eql(data[1]._id)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.not.be.eql(dataEntitiesRes[1]._id)
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce updated references when no humanReadableKey conflict but entities referenced in conflict', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'f1',
+        'f1/d2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d1', 't1', 'f1/d2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+
+        data[0]._id.should.not.be.eql(data[1]._id)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.not.be.eql('d1')
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.not.be.eql(dataEntitiesRes[1]._id)
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].data.shortid.should.not.be.eql(d1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce updated references when folder humanReadableKey conflict (import on root)', async () => {
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
+      await exportEntities(
+        'f1',
+        'f1/t1'
+      )
+
+      await importEntities(
+        'f3',
+        'f3/f2', { shortid: 'f1' }
+      )
+
+      await assertExists('f1', 'f3', 'f3/f2', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(3)
+        templates.should.have.length(1)
+        folders.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql('f1'))
+        folders.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql('f1'))
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-
-      await reporter.documentStore.collection('templates').remove({})
-
-      // doing this because reporter.documentStore.collection('folders').remove({}) does not
-      // delete all entities with mongodb store
-      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
-        return reporter.documentStore.collection('folders').remove({
-          _id: e._id
-        })
-      }))
-
-      const container = await reporter.documentStore.collection('folders').insert({
-        name: 'container'
-      })
-
-      await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: f1.shortid,
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(3)
-      templatesRes.should.have.length(1)
-
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('container') && should(f.folder).be.not.ok())
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql(f1.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql(f1.shortid))
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].folder.shortid.should.be.not.eql(f1.shortid)
     })
 
     it('should produce updated references when folder humanReadableKey conflict (import on folder)', async () => {
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
+      await exportEntities(
+        'f1',
+        'f1/t1'
+      )
+
+      await importEntities(
+        { targetFolder: 'fcontainer' },
+        'fcontainer',
+        'fcontainer/fparent',
+        'fcontainer/fparent/f2', { shortid: 'f1' }
+      )
+
+      await assertExists('fcontainer', 'fcontainer/f1', 'fcontainer/f1/t1', 'fcontainer/fparent', 'fcontainer/fparent/f2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(4)
+        templates.should.have.length(1)
+        folders.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql('f1'))
+        folders.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql('f1'))
+        templates[0].folder.shortid.should.be.not.eql('f1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-
-      await reporter.documentStore.collection('templates').remove({})
-
-      // doing this because reporter.documentStore.collection('folders').remove({}) does not
-      // delete all entities with mongodb store
-      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
-        return reporter.documentStore.collection('folders').remove({
-          _id: e._id
-        })
-      }))
-
-      const container = await reporter.documentStore.collection('folders').insert({
-        name: 'container'
-      })
-
-      const parent = await reporter.documentStore.collection('folders').insert({
-        name: 'parent',
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: f1.shortid,
-        folder: {
-          shortid: parent.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: container.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(4)
-      templatesRes.should.have.length(1)
-
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('container') && should(f.folder).be.not.ok())
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('parent') && f.folder.shortid.should.be.eql(container.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql(f1.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql(f1.shortid))
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].folder.shortid.should.be.not.eql(f1.shortid)
     })
   })
 
   describe('when entity path conflict', () => {
     it('should produce entity update when _id conflict on same folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities('t1', { _id: 't1' })
+
+      await assertExists('t1', (entities) => {
+        const { templates } = entities
+        templates.should.have.length(1)
+        templates[0]._id.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].name.should.be.eql(t1.name)
     })
 
     it('should produce entity update when _id conflict on same folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/t1', { _id: 't1' }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(1)
+        templates[0]._id.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.folder.shortid.should.be.eql(f1.shortid))
     })
 
     it('should produce entity update when _id conflict on different folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        'f1',
+        'f1/t2', { _id: 't1' },
+        't1', { _id: undefined }
+      )
+
+      await assertExists('f1', 't1', 'f1/t2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0]._id.should.be.not.eql(templates[1]._id)
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t1') &&
+          t._id.should.be.not.eql('t1') &&
+          t.engine.should.be.eql('handlebars')
+        ))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('foo') &&
-        t._id.should.be.not.eql(t1._id) &&
-        t.engine.should.be.eql(t1.engine) &&
-        should(t.folder).be.not.ok()
-      ))
     })
 
     it('should produce entity update when _id conflict on different folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        't2', { _id: 't1' },
+        'f1',
+        'f1/t1', { _id: undefined }
+      )
+
+      await assertExists('t2', 'f1', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0]._id.should.be.not.eql(templates[1]._id)
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t1') &&
+          t._id.should.be.not.eql('t1') &&
+          t.engine.should.be.eql('handlebars')
+        ))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && should(t.folder).be.not.ok())
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('foo') &&
-        t._id.should.be.not.eql(t1._id) &&
-        t.engine.should.be.eql(t1.engine) &&
-        t.folder.shortid.should.be.eql(f1.shortid)
-      ))
     })
 
     it('should produce entity update when humanReadableKey conflict on same folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities('t1', { shortid: 't1' })
+
+      await assertExists('t1', (entities) => {
+        const { templates } = entities
+        templates.should.have.length(1)
+        templates[0].shortid.should.be.eql('t1')
+        templates[0].engine.should.be.eql('handlebars')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].engine.should.be.eql('handlebars')
     })
 
     it('should produce entity update when humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/t1', { shortid: 't1' }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { templates } = entities
+        templates.should.have.length(1)
+        templates[0].shortid.should.be.eql('t1')
+        templates[0].engine.should.be.eql('handlebars')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].engine.should.be.eql(t1.engine)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update and keep references when humanReadableKey conflict on same folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'd1', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d1', 't1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].name.should.be.eql('data')
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
     })
 
     it('should produce entity update and keep references when humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('f1/t1', 'f1/d1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].name.should.be.eql('data')
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update when humanReadableKey conflict on different folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        'f1',
+        'f1/t2', { shortid: 't1' },
+        't1', { _id: undefined, shortid: undefined }
+      )
+
+      await assertExists('t1', 'f1', 'f1/t2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t1') &&
+          t._id.should.be.not.eql('t1') &&
+          t.engine.should.be.eql('handlebars')
+        ))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('foo') &&
-        t._id.should.be.not.eql(t1._id) &&
-        t.engine.should.be.eql(t1.engine) &&
-        should(t.folder).be.not.ok()
-      ))
     })
 
     it('should produce entity update when humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        't2', { shortid: 't1' },
+        'f1',
+        'f1/t1', { _id: undefined, shortid: undefined }
+      )
+
+      await assertExists('t2', 'f1', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t1') &&
+          t.shortid.should.be.not.eql('t1') &&
+          t.engine.should.be.eql('handlebars')
+        ))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && should(t.folder).be.not.ok())
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('foo') &&
-        t._id.should.be.not.eql(t1._id) &&
-        t.engine.should.be.eql(t1.engine) &&
-        t.folder.shortid.should.be.eql(f1.shortid)
-      ))
     })
 
     it('should produce entity update and updated references when humanReadableKey conflict on different folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'd1', { _id: undefined, shortid: undefined, dataJson: `{ "a": "b" }` },
+        'f1',
+        'f1/d2', { shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d1', 't1', 'f1/d2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.not.eql('d1')
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].data.shortid.should.be.not.eql(d1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity update and updated references when humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'd2', { shortid: 'd1', dataJson: `{ "a": "b" }` },
+        'f1',
+        'f1/d1', { _id: undefined, shortid: undefined, dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d2', 'f1/d1', 'f1/t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.not.eql('d1')
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        JSON.parse(d.dataJson).a.should.be.eql('a') &&
-        d.folder.shortid.should.be.eql(f1.shortid)
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        JSON.parse(d.dataJson).a.should.be.eql('b') &&
-        should(d.folder).be.not.ok()
-      ))
-
-      templatesRes[0].data.shortid.should.be.not.eql(d1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on same folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities('t1', { _id: 't1', shortid: 't1' })
+
+      await assertExists('t1', (entities) => {
+        const { templates } = entities
+        templates.should.have.length(1)
+        templates[0]._id.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
+        templates[0].engine.should.be.eql('handlebars')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'foo',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].engine.should.be.eql('handlebars')
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/t1', { _id: 't1', shortid: 't1' }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { templates } = entities
+        templates.should.have.length(1)
+        templates[0]._id.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
+        templates[0].engine.should.be.eql('handlebars')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'foo',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
-      templatesRes[0].engine.should.be.eql(t1.engine)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update and keep references when both _id and humanReadableKey conflict on same folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'd1', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d1', 't1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0]._id.should.be.eql('d1')
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].name.should.be.eql('data')
-      dataEntitiesRes[0]._id.should.be.eql(d1._id)
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
     })
 
     it('should produce entity update and keep references when both _id and humanReadableKey conflict on same folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('f1/d1', 'f1/t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(1)
+        templates.should.have.length(1)
+        data[0]._id.should.be.eql('d1')
+        data[0].shortid.should.be.eql('d1')
+        JSON.parse(data[0].dataJson).a.should.be.eql('a')
+        templates[0].data.shortid.should.be.eql('d1')
+        templates[0].folder.shortid.should.be.eql('f1')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0].name.should.be.eql('data')
-      dataEntitiesRes[0]._id.should.be.eql(d1._id)
-      dataEntitiesRes[0].shortid.should.be.eql(d1.shortid)
-      JSON.parse(dataEntitiesRes[0].dataJson).a.should.be.eql('a')
-      dataEntitiesRes[0].folder.shortid.should.be.eql(f1.shortid)
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].data.shortid.should.be.eql(d1.shortid)
-      templatesRes[0].folder.shortid.should.be.eql(f1.shortid)
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on different folder level (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        't1', { _id: undefined, shortid: undefined },
+        'f1',
+        'f1/t2', { _id: 't1', shortid: 't1' }
+      )
+
+      await assertExists('t1', 'f1/t2', (entities) => {
+        const { templates, folders } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0]._id.should.be.not.eql(templates[1]._id)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t2') &&
+          t._id.should.be.eql('t1') &&
+          t.shortid.should.be.eql('t1')
+        ))
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t1') &&
+          t._id.should.be.not.eql('t1') &&
+          t.shortid.should.be.not.eql('t1') &&
+          t.engine.should.be.eql('handlebars')
+        ))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('bar') &&
-        t._id.should.be.eql(t1._id) &&
-        t.shortid.should.be.eql(t1.shortid) &&
-        t.folder.shortid.should.be.eql(f1.shortid)
-      ))
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('foo') &&
-        t._id.should.be.not.eql(t1._id) &&
-        t.shortid.should.be.not.eql(t1.shortid) &&
-        t.engine.should.be.eql(t1.engine) &&
-        should(t.folder).be.not.ok()
-      ))
     })
 
     it('should produce entity update when both _id and humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html'
+      await exportEntities('t1', { engine: 'handlebars' })
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        't2', { _id: 't1', shortid: 't1' },
+        'f1',
+        'f1/t1', { _id: undefined, shortid: undefined }
+      )
+
+      await assertExists('t2', 'f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(2)
+        templates[0]._id.should.be.not.eql(templates[1]._id)
+        templates[0].shortid.should.be.not.eql(templates[1].shortid)
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t2') &&
+          t._id.should.be.eql('t1') &&
+          t.shortid.should.be.eql('t1')
+        ))
+
+        templates.should.matchAny((t) => (
+          t.name.should.be.eql('t1') &&
+          t._id.should.be.not.eql('t1') &&
+          t.shortid.should.be.not.eql('t1') &&
+          t.engine.should.be.eql('handlebars')
+        ))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        shortid: t1.shortid,
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(2)
-
-      templatesRes[0]._id.should.be.not.eql(templatesRes[1]._id)
-      templatesRes[0].shortid.should.be.not.eql(templatesRes[1].shortid)
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('bar') &&
-        t._id.should.be.eql(t1._id) &&
-        t.shortid.should.be.eql(t1.shortid) &&
-        should(t.folder).be.not.ok()
-      ))
-
-      templatesRes.should.matchAny((t) => (
-        t.name.should.be.eql('foo') &&
-        t._id.should.be.not.eql(t1._id) &&
-        t.shortid.should.be.not.eql(t1.shortid) &&
-        t.engine.should.be.eql(t1.engine) &&
-        t.folder.shortid.should.be.eql(f1.shortid)
-      ))
     })
 
     it('should produce entity update and updated references when both _id and humanReadableKey conflict on different folder level (import on root)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        'd1', { _id: undefined, shortid: undefined, dataJson: `{ "a": "b" }` },
+        'f1',
+        'f1/d2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d1', 't1', 'f1/d2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+        data[0]._id.should.not.be.eql(data[1]._id)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          d._id.should.be.not.eql('d1') &&
+          d.shortid.should.be.not.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          d.folder.shortid.should.be.eql('f1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.not.eql('d1')
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.not.be.eql(dataEntitiesRes[1]._id)
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        d._id.should.be.not.eql(d1._id) &&
-        d.shortid.should.be.not.eql(d1.shortid) &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].data.shortid.should.be.not.eql(d1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity update and updated references when both _id and humanReadableKey conflict on different folder level (import on folder)', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'd2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` },
+        'f1',
+        'f1/d1', { _id: undefined, shortid: undefined, dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('d2', 'f1/d1', 'f1/t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+        data[0]._id.should.not.be.eql(data[1]._id)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          d._id.should.be.not.eql('d1') &&
+          d.shortid.should.be.not.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].data.shortid.should.be.not.eql('d1')
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.not.be.eql(dataEntitiesRes[1]._id)
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        d._id.should.be.not.eql(d1._id) &&
-        d.shortid.should.be.not.eql(d1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('a') &&
-        d.folder.shortid.should.be.eql(f1.shortid)
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        JSON.parse(d.dataJson).a.should.be.eql('b') &&
-        should(d.folder).be.not.ok()
-      ))
-
-      templatesRes[0].data.shortid.should.be.not.eql(d1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity update and updated references when no humanReadableKey conflict but entities referenced in conflict', async () => {
-      const d1 = await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "a" }`
+      await exportEntities(
+        'd1', { dataJson: `{ "a": "a" }` },
+        't1', { engine: 'handlebars', data: { shortid: 'd1' } }
+      )
+
+      await importEntities(
+        't1', { _id: undefined, shortid: undefined },
+        'd1', { _id: undefined, shortid: undefined, dataJson: `{ "a": "b" }` },
+        'f1',
+        'f1/d2', { _id: 'd1', shortid: 'd1', dataJson: `{ "a": "b" }` }
+      )
+
+      await assertExists('t1', 'd1', 'f1/d2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(2)
+        templates.should.have.length(1)
+
+        data[0]._id.should.not.be.eql(data[1]._id)
+        data[0].shortid.should.not.be.eql(data[1].shortid)
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d1') &&
+          d._id.should.be.not.eql('d1') &&
+          d.shortid.should.be.not.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('a')
+        ))
+
+        data.should.matchAny((d) => (
+          d.name.should.be.eql('d2') &&
+          d._id.should.be.eql('d1') &&
+          d.shortid.should.be.eql('d1') &&
+          JSON.parse(d.dataJson).a.should.be.eql('b')
+        ))
+
+        templates[0].engine.should.be.eql('handlebars')
+        templates[0].data.shortid.should.not.be.eql('d1')
+        templates[0].data.shortid.should.be.eql(data.find((d) => d.name === 'd1').shortid)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'handlebars',
-        recipe: 'html',
-        data: {
-          shortid: d1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([d1._id.toString(), t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('data').remove({})
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'folder',
-        shortid: 'folder'
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'data',
-        dataJson: `{ "a": "b" }`
-      })
-
-      await reporter.documentStore.collection('data').insert({
-        _id: d1._id,
-        name: 'data2',
-        shortid: d1.shortid,
-        dataJson: `{ "a": "b" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataEntitiesRes = await reporter.documentStore.collection('data').find({})
-
-      dataEntitiesRes.should.have.length(2)
-      templatesRes.should.have.length(1)
-
-      dataEntitiesRes[0]._id.should.not.be.eql(dataEntitiesRes[1]._id)
-      dataEntitiesRes[0].shortid.should.not.be.eql(dataEntitiesRes[1].shortid)
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data') &&
-        d._id.should.be.not.eql(d1._id) &&
-        d.shortid.should.be.not.eql(d1.shortid) &&
-        should(d.folder).be.not.ok() &&
-        JSON.parse(d.dataJson).a.should.be.eql('a')
-      ))
-
-      dataEntitiesRes.should.matchAny((d) => (
-        d.name.should.be.eql('data2') &&
-        d._id.should.be.eql(d1._id) &&
-        d.shortid.should.be.eql(d1.shortid) &&
-        d.folder.shortid.should.be.eql(f1.shortid) &&
-        JSON.parse(d.dataJson).a.should.be.eql('b')
-      ))
-
-      templatesRes[0].engine.should.be.eql(t1.engine)
-      templatesRes[0].data.shortid.should.not.be.eql(d1.shortid)
-      templatesRes[0].data.shortid.should.be.eql(dataEntitiesRes.find((d) => d.name === 'data').shortid)
     })
 
     it('should produce entity replace when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities('d1', { name: 't1', dataJson: `{ "a": "a" }` })
+
+      await assertExists('t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
     })
 
     it('should produce entity replace when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
     })
 
     it('should produce entity replace when there is conflict between entities of different entity sets (fullImport: true)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { fullImport: true },
+        'd1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      await reporter.import(exportPath, {
-        fullImport: true
-      }, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
     })
 
     it('should produce entity replace (keeping _id) when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities('d1', { name: 't1', dataJson: `{ "a": "a" }` })
+
+      await assertExists('t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
+        templates[0]._id.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0]._id.should.be.eql(t1._id)
     })
 
     it('should produce entity replace (keeping _id) when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
+        templates[0]._id.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0]._id.should.be.eql(t1._id)
     })
 
     it('should produce entity replace (keeping humanReadableKey) when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'd1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
     })
 
     it('should produce entity replace (keeping humanReadableKey) when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
     })
 
     it('should produce entity replace (keeping _id, humanReadableKey) when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'd1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('t1', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
+        templates[0]._id.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
     })
 
     it('should produce entity replace (keeping _id, humanReadableKey) when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
+        templates[0]._id.should.be.eql('t1')
+        templates[0].shortid.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0]._id.should.be.eql(t1._id)
-      templatesRes[0].shortid.should.be.eql(t1.shortid)
     })
 
     it('should produce entity replace (generating new _id) when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'd1', { name: 't1', dataJson: `{ "a": "a" }` },
+        't2', { _id: 't1' }
+      )
+
+      await assertExists('t1', 't2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(2)
+        templates.should.matchAny((t) => t.name.should.be.eql('t1') && t._id.should.not.be.eql('t1'))
+        templates.should.matchAny((t) => t.name.should.be.eql('t2') && t._id.should.be.eql('t1'))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(2)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t._id.should.not.be.eql(t1._id))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t._id.should.be.eql(t1._id))
     })
 
     it('should produce entity replace (generating new _id) when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` },
+        'f1/t2', { _id: 't1' }
+      )
+
+      await assertExists('f1/t1', 'f1/t2', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(2)
+        templates.should.matchAny((t) => t.name.should.be.eql('t1') && t._id.should.not.be.eql('t1'))
+        templates.should.matchAny((t) => t.name.should.be.eql('t2') && t._id.should.be.eql('t1'))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(2)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t._id.should.not.be.eql(t1._id))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t._id.should.be.eql(t1._id))
     })
 
     it('should produce entity replace (generating new humanReadableKey) when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'd1', { name: 't1', dataJson: `{ "a": "a" }` },
+        'f1',
+        'f1/t2', { shortid: 't1' }
+      )
+
+      await assertExists('t1', 'f1/t2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(2)
+        templates.should.matchAny((t) => t.name.should.be.eql('t1') && t.shortid.should.not.be.eql('t1'))
+        templates.should.matchAny((t) => t.name.should.be.eql('t2') && t.shortid.should.be.eql('t1'))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        shortid: t1.shortid,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(2)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.shortid.should.not.be.eql(t1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.shortid.should.be.eql(t1.shortid))
     })
 
     it('should produce entity replace (generating new humanReadableKey) when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` },
+        't2', { shortid: 't1' }
+      )
+
+      await assertExists('t2', 'f1/t1', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(2)
+        templates.should.matchAny((t) => t.name.should.be.eql('t1') && t.shortid.should.not.be.eql('t1'))
+        templates.should.matchAny((t) => t.name.should.be.eql('t2') && t.shortid.should.be.eql('t1'))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        shortid: t1.shortid,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(2)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t.shortid.should.not.be.eql(t1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.shortid.should.be.eql(t1.shortid))
     })
 
     it('should produce entity replace (generating new _id, humanReadableKey) when there is conflict between entities of different entity sets (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'd1', { name: 't1', dataJson: `{ "a": "a" }` },
+        'f1',
+        'f1/t2', { _id: 't1', shortid: 't1' }
+      )
+
+      await assertExists('t1', 'f1/t2', (entities) => {
+        const { templates, data } = entities
+        data.should.have.length(0)
+        templates.should.have.length(2)
+        templates.should.matchAny((t) => t.name.should.be.eql('t1') && t._id.should.not.be.eql('t1') && t.shortid.should.not.be.eql('t1'))
+        templates.should.matchAny((t) => t.name.should.be.eql('t2') && t._id.should.be.eql('t1') && t.shortid.should.be.eql('t1'))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        shortid: t1.shortid,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(2)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t._id.should.not.be.eql(t1._id) && t.shortid.should.not.be.eql(t1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t._id.should.be.eql(t1._id) && t.shortid.should.be.eql(t1.shortid))
     })
 
     it('should produce entity replace (generating new _id, humanReadableKey) when there is conflict between entities of different entity sets (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'f1' },
+        't2', { _id: 't1', shortid: 't1' },
+        'f1',
+        'f1/d1', { name: 't1', dataJson: `{ "a": "a" }` }
+      )
+
+      await assertExists('t2', 'f1/t1', (entities) => {
+        const { folders, templates, data } = entities
+        folders.should.have.length(1)
+        data.should.have.length(0)
+        templates.should.have.length(2)
+        templates.should.matchAny((t) => t.name.should.be.eql('t1') && t._id.should.not.be.eql('t1') && t.shortid.should.not.be.eql('t1'))
+        templates.should.matchAny((t) => t.name.should.be.eql('t2') && t._id.should.be.eql('t1') && t.shortid.should.be.eql('t1'))
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({ name: 'folder', shortid: 'folder' })
-
-      await reporter.documentStore.collection('data').insert({
-        name: 'foo',
-        dataJson: `{ "a": "a" }`,
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        _id: t1._id,
-        shortid: t1.shortid,
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: f1.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-      const dataRes = await reporter.documentStore.collection('data').find({})
-
-      foldersRes.should.have.length(1)
-      dataRes.should.have.length(0)
-      templatesRes.should.have.length(2)
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('foo') && t._id.should.not.be.eql(t1._id) && t.shortid.should.not.be.eql(t1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t._id.should.be.eql(t1._id) && t.shortid.should.be.eql(t1.shortid))
     })
 
     it('should produce entity replace and child entities removed when there is conflict between folder and other entity set (import on root)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        'f1', { name: 't1' },
+        't1/t2',
+        't1/t3',
+        't1/f2',
+        't1/f2/t4'
+      )
+
+      await assertExists('t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(0)
+        templates.should.have.length(1)
+        templates[0].name.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'foo'
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'baz',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const f2 = await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: 'f2',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'lorem',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f2.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(0)
-      templatesRes.should.have.length(1)
-
-      templatesRes[0].name.should.be.eql('foo')
     })
 
     it('should produce entity replace and child entities removed when there is conflict between folder and other entity set (import on folder)', async () => {
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
+      await exportEntities('t1')
+
+      await importEntities(
+        { targetFolder: 'fcontainer' },
+        'fcontainer',
+        'fcontainer/f1', { name: 't1' },
+        'fcontainer/t1/t2',
+        'fcontainer/t1/t3',
+        'fcontainer/t1/f2',
+        'fcontainer/t1/f2/t4'
+      )
+
+      await assertExists('fcontainer/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(1)
+        folders[0].name.should.be.eql('fcontainer')
+        templates[0].name.should.be.eql('t1')
       })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      const container = await reporter.documentStore.collection('folders').insert({
-        name: 'container',
-        shortid: 'container'
-      })
-
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'foo',
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'baz',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const f2 = await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: 'f2',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'lorem',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f2.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: container.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(1)
-      templatesRes.should.have.length(1)
-
-      foldersRes[0].name.should.be.eql('container')
-      templatesRes[0].name.should.be.eql('foo')
     })
 
     it('should produce entity replace and child entities inserted when there is conflict between other entity set and folder (import on root)', async () => {
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'foo'
+      await exportEntities(
+        'f1', { name: 'tf' },
+        'tf/t1',
+        'tf/t2',
+        'tf/f2',
+        'tf/f2/t3'
+      )
+
+      await importEntities('tf')
+
+      await assertExists('tf/t1', 'tf/t2', 'tf/f2', 'tf/f2/t3', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(2)
+        templates.should.have.length(3)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const t2 = await reporter.documentStore.collection('templates').insert({
-        name: 'baz',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const f2 = await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: 'f2',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const t3 = await reporter.documentStore.collection('templates').insert({
-        name: 'lorem',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f2.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString(), t2._id.toString(), t3._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      // doing this because reporter.documentStore.collection('folders').remove({}) does not
-      // delete all entities with mongodb store
-      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
-        return reporter.documentStore.collection('folders').remove({
-          _id: e._id
-        })
-      }))
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html'
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(2)
-      templatesRes.should.have.length(3)
-
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('foo') && should(f.folder).be.not.ok())
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f2') && f.folder.shortid.should.be.eql(f1.shortid))
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('baz') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('lorem') && t.folder.shortid.should.be.eql(f2.shortid))
     })
 
     it('should produce entity replace and child entities inserted when there is conflict between other entity set and folder (import on folder)', async () => {
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'foo'
+      await exportEntities(
+        'f1',
+        'f1/t1',
+        'f1/t2',
+        'f1/f2',
+        'f1/f2/t3'
+      )
+
+      await importEntities(
+        { targetFolder: 'fcontainer' },
+        'fcontainer',
+        'fcontainer/tfoo', { name: 'f1' }
+      )
+
+      await assertExists('fcontainer/f1', 'fcontainer/f1/t1', 'fcontainer/f1/t2', 'fcontainer/f1/f2', 'fcontainer/f1/f2/t3', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(3)
+        templates.should.have.length(3)
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'bar',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const t2 = await reporter.documentStore.collection('templates').insert({
-        name: 'baz',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const f2 = await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: 'f2',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const t3 = await reporter.documentStore.collection('templates').insert({
-        name: 'lorem',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f2.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString(), t2._id.toString(), t3._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-      await reporter.documentStore.collection('templates').remove({})
-
-      // doing this because reporter.documentStore.collection('folders').remove({}) does not
-      // delete all entities with mongodb store
-      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
-        return reporter.documentStore.collection('folders').remove({
-          _id: e._id
-        })
-      }))
-
-      const container = await reporter.documentStore.collection('folders').insert({
-        name: 'container',
-        shortid: 'container'
-      })
-
-      await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: container.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(3)
-      templatesRes.should.have.length(3)
-
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('container') && should(f.folder).be.not.ok())
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('foo') && f.folder.shortid.should.be.eql(container.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f2') && f.folder.shortid.should.be.eql(f1.shortid))
-
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('bar') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('baz') && t.folder.shortid.should.be.eql(f1.shortid))
-      templatesRes.should.matchAny((t) => t.name.should.be.eql('lorem') && t.folder.shortid.should.be.eql(f2.shortid))
     })
 
     it('should produce updated references when folder humanReadableKey conflict (import on root)', async () => {
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
+      await exportEntities(
+        'f1',
+        'f1/t1'
+      )
+
+      await importEntities(
+        'f1', { _id: undefined, shortid: 'custom' },
+        'fcontainer',
+        'fcontainer/f2', { shortid: 'f1' }
+      )
+
+      await assertExists('f1/t1', 'fcontainer/f2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(3)
+        templates.should.have.length(1)
+        folders.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql('f1'))
+        folders.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql('f1') && f.shortid.should.be.eql('custom'))
+        templates[0].name.should.be.eql('t1')
+        templates[0].folder.shortid.should.be.eql('custom')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-
-      await reporter.documentStore.collection('templates').remove({})
-
-      // doing this because reporter.documentStore.collection('folders').remove({}) does not
-      // delete all entities with mongodb store
-      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
-        return reporter.documentStore.collection('folders').remove({
-          _id: e._id
-        })
-      }))
-
-      const f1Local = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
-      })
-
-      const container = await reporter.documentStore.collection('folders').insert({
-        name: 'container'
-      })
-
-      await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: f1.shortid,
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      await reporter.import(exportPath, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(3)
-      templatesRes.should.have.length(1)
-
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('container') && should(f.folder).be.not.ok())
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql(f1.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql(f1.shortid) && f.shortid.should.be.eql(f1Local.shortid))
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].folder.shortid.should.be.eql(f1Local.shortid)
     })
 
     it('should produce updated references when folder humanReadableKey conflict (import on folder)', async () => {
-      const f1 = await reporter.documentStore.collection('folders').insert({
-        name: 'f1'
+      await exportEntities(
+        'f1',
+        'f1/t1'
+      )
+
+      await importEntities(
+        { targetFolder: 'fcontainer' },
+        'fcontainer',
+        'fcontainer/f1', { _id: undefined, shortid: 'custom' },
+        'fcontainer/fparent',
+        'fcontainer/fparent/f2', { shortid: 'f1' }
+      )
+
+      await assertExists('fcontainer/f1/t1', 'fcontainer/fparent/f2', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(4)
+        templates.should.have.length(1)
+        folders.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql('f1'))
+        folders.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql('f1') && f.shortid.should.be.eql('custom'))
+        templates[0].name.should.be.eql('t1')
+        templates[0].folder.shortid.should.be.eql('custom')
       })
-
-      const t1 = await reporter.documentStore.collection('templates').insert({
-        name: 'foo',
-        engine: 'none',
-        recipe: 'html',
-        folder: {
-          shortid: f1.shortid
-        }
-      })
-
-      const req = reporter.Request({})
-      const { stream } = await reporter.export([t1._id.toString()], req)
-      const exportPath = await saveExportStream(reporter, stream)
-
-      await reporter.documentStore.collection('templates').remove({})
-
-      // doing this because reporter.documentStore.collection('folders').remove({}) does not
-      // delete all entities with mongodb store
-      await Promise.all((await reporter.documentStore.collection('folders').find({})).map(async (e) => {
-        return reporter.documentStore.collection('folders').remove({
-          _id: e._id
-        })
-      }))
-
-      const container = await reporter.documentStore.collection('folders').insert({
-        name: 'container'
-      })
-
-      const f1Local = await reporter.documentStore.collection('folders').insert({
-        name: 'f1',
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      const parent = await reporter.documentStore.collection('folders').insert({
-        name: 'parent',
-        folder: {
-          shortid: container.shortid
-        }
-      })
-
-      await reporter.documentStore.collection('folders').insert({
-        name: 'f2',
-        shortid: f1.shortid,
-        folder: {
-          shortid: parent.shortid
-        }
-      })
-
-      await reporter.import(exportPath, {
-        targetFolder: container.shortid
-      }, req)
-
-      const foldersRes = await reporter.documentStore.collection('folders').find({})
-      const templatesRes = await reporter.documentStore.collection('templates').find({})
-
-      foldersRes.should.have.length(4)
-      templatesRes.should.have.length(1)
-
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('container') && should(f.folder).be.not.ok())
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('parent') && f.folder.shortid.should.be.eql(container.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f2') && f.shortid.should.be.eql(f1.shortid))
-      foldersRes.should.matchAny((f) => f.name.should.be.eql('f1') && f.shortid.should.be.not.eql(f1.shortid) && f.shortid.should.be.eql(f1Local.shortid))
-
-      templatesRes[0].name.should.be.eql('foo')
-      templatesRes[0].folder.shortid.should.be.eql(f1Local.shortid)
     })
   })
 }
