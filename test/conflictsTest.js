@@ -102,6 +102,44 @@ module.exports = (getReporter) => {
       })
     })
 
+    it('should produce entity update when humanReadableKey conflict of parent folder on same folder level (import on root)', async () => {
+      await exportEntities(
+        'f1',
+        'f1/t1'
+      )
+
+      await importEntities(
+        'f2', { shortid: 'f1' },
+        'f2/t1'
+      )
+
+      await assertExists('f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(1)
+        templates.should.have.length(1)
+      })
+    })
+
+    it('should produce entity update when humanReadableKey conflict of parent folder on same folder level (import on folder)', async () => {
+      await exportEntities(
+        'f1',
+        'f1/t1'
+      )
+
+      await importEntities(
+        { targetFolder: 'fcontainer' },
+        'fcontainer',
+        'fcontainer/f2', { shortid: 'f1' },
+        'fcontainer/f2/t1'
+      )
+
+      await assertExists('fcontainer/f1/t1', (entities) => {
+        const { folders, templates } = entities
+        folders.should.have.length(2)
+        templates.should.have.length(1)
+      })
+    })
+
     it('should produce entity update and keep references when humanReadableKey conflict on same folder level (import on root)', async () => {
       await exportEntities(
         'd1', { dataJson: `{ "a": "a" }` },
