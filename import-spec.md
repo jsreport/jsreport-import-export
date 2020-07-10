@@ -8,22 +8,22 @@ the logic assumes we want the import/export flow to be incremental and for that 
 
 1. we should always **preserve local `_id`**
 2. we should always **preserve local `shortid`**
-3. we should always try to **reuse and keep the `_id` and `shortid` fields from the zip, and only in case of conflict re-generate it on the zip**
-4. when there is **conflict about `_id` then we just regenerate it on the zip** and continue with the expected operation (insert or update)
-5. when we need to **regenerate `shortid` field we should always fix the references to that field on the export zip**
+3. we should always try to **reuse and keep the `_id` and `shortid` fields from the export file, and only in case of conflict re-generate it on the export file**
+4. when there is **conflict about `_id` then we just regenerate it on the export file** and continue with the expected operation (insert or update)
+5. when we need to **regenerate `shortid` field we should always fix the references to that field on the export file**
 
 ### logic
 
 the logic is based on the idea that we should detect duplicates by the **entity path**, and according to that decide if we need to process the entity as a new one or as an update to it.
 
 1. **no collision on path**
-    1. **no conflict of shortid** -> **insert** normally, nothing to fix on the zip here
+    1. **no conflict of shortid** -> **insert** normally, nothing to fix on the export file here
     2. **shortid conflict** -> two things can happen here
-        1. **target path of the import is the same than the parent path of local entity in conflict** -> if we ever get to this point it means that the entity was just renamed, and then we should just **update existing with values from zip,** nothing to fix on the zip here
-        2. **target path of the import is different than the parent path of local entity in conflict** -> **insert with new shortid and update references on the zip to the new generated shortid**
+        1. **target path of the import is the same than the parent path of local entity in conflict** -> if we ever get to this point it means that the entity was just renamed, and then we should just **update existing with values from export file,** nothing to fix on the export file here
+        2. **target path of the import is different than the parent path of local entity in conflict** -> **insert with new shortid and update references on the export file to the new generated shortid**
 2. **collision on path**
-    1. **no conflict of shortid** -> **update existing with values from zip except shortid, update references on the zip to the shortid of local**
-    2. **shortid conflict** -> **update existing entity** normally**,** nothing to fix on the zip here
+    1. **no conflict of shortid** -> **update existing with values from export file except shortid, update references on the export file to the shortid of local**
+    2. **shortid conflict** -> **update existing entity** normally**,** nothing to fix on the export file here
 
 as we can see from the above notes, an entity will either be **inserted** or **updated** depending if there is collision on path or not
 
@@ -39,4 +39,4 @@ importing of duplicated entity into folder is covered on point `1.2.2` of the lo
 
 ### **Caveats:**
 
-- since we will now update shortid and references to new values there are some cases which we won't be able to automatically "fix", for example if user does api calls with { template: { shortid: 'xx' } } or document store reads in scripts using old shortid then such code can break. this can happen in the **update entity case**, if you for example create entity /a/b on you local, then in other machine you also create /a/b and export, then if you try to import that zip on your local the new logic will detect a conflict by entity path
+- since we will now update shortid and references to new values there are some cases which we won't be able to automatically "fix", for example if user does api calls with { template: { shortid: 'xx' } } or document store reads in scripts using old shortid then such code can break. this can happen in the **update entity case**, if you for example create entity /a/b on you local, then in other machine you also create /a/b and export, then if you try to import that export file on your local the new logic will detect a conflict by entity path

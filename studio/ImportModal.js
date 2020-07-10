@@ -184,7 +184,7 @@ class ImportModal extends Component {
         </div>
         <div className='form-group'>
           <FileInput
-            placeholder='select import zip file...'
+            placeholder='select export file to import...'
             selectedFile={this.state.selectedFile}
             onFileSelect={(file) => this.setState({ selectedFile: file })}
             disabled={this.state.processing === true || this.state.validated}
@@ -249,7 +249,7 @@ class ImportModal extends Component {
               </div>
               {this.state.fullImport && (
                 <p style={{ marginTop: '10px' }}>
-                  A <b>full import</b> means that <b>all the entities that are not present in the zip will be deleted</b>, after the import <b>you will have only the entities that were present in the zip</b>.
+                  A <b>full import</b> means that <b>all the entities that are not present in the export file will be deleted</b>, after the import <b>you will have only the entities that were present in the export file</b>.
                 </p>
               )}
             </div>

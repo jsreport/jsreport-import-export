@@ -4,7 +4,7 @@ const FormData = require('form-data')
 const doRequest = require('./doRequest')
 const normalizePath = require('./normalizePath')
 
-const description = 'Import a zip with entities in the specified jsreport instance'
+const description = 'Import an export file with entities in the specified jsreport instance'
 const command = 'import'
 
 exports.command = command
@@ -24,13 +24,13 @@ exports.builder = (yargs) => {
   const commandOptions = {
     targetFolder: {
       alias: 't',
-      description: 'The target folder shortid, the entities of the zip will be imported inside the specified folder',
+      description: 'The target folder shortid, the entities of the export file will be imported inside the specified folder',
       type: 'string',
       requiresArg: true
     },
     fullImport: {
       alias: 'f',
-      description: 'Perform a full import, which means that after the import you will have only the entities that were present in the zip',
+      description: 'Perform a full import, which means that after the import you will have only the entities that were present in the export file',
       type: 'boolean'
     },
     validation: {
@@ -340,10 +340,10 @@ async function startImport (jsreportInstance, { remote, importOptions, input, lo
     }, {})
 
     if (entityCountPerSet.length > 0) {
-      logger.info(`${!importOptions.validation ? 'imported by ' : ''}entitySet${importOptions.validation ? ' in zip' : ''}: ${entityCountPerSet.join(', ')}`)
+      logger.info(`${!importOptions.validation ? 'imported by ' : ''}entitySet${importOptions.validation ? ' in export file' : ''}: ${entityCountPerSet.join(', ')}`)
     }
 
-    logger.info(`total entities ${importOptions.validation ? 'in zip' : 'imported'}: ${count}`)
+    logger.info(`total entities ${importOptions.validation ? 'in export file' : 'imported'}: ${count}`)
   }
 
   logger.info(`import${importOptions.validation ? ' validation' : ''} finished`)
@@ -403,11 +403,11 @@ function getUsage (command) {
 
 function getExamples (command) {
   return [
-    [`${command} jsreportExport.zip`, `Import the zip file into the local instance`],
-    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com`, `Import the zip file into the jsreport instance at http://jsreport-host.com`],
-    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com --user admin --password xxxx`, `Import the zip file into the authenticated jsreport instance at http://jsreport-host.com`],
+    [`${command} jsreportExport.zip`, `Import the export file into the local instance`],
+    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com`, `Import the export file into the jsreport instance at http://jsreport-host.com`],
+    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com --user admin --password xxxx`, `Import the export file into the authenticated jsreport instance at http://jsreport-host.com`],
     [`${command} jsreportExport.zip --fullImport`, `Execute a full import into the local instance`],
-    [`${command} jsreportExport.zip --targetFolder=folderShortid`, `Execute an import into a target folder, the entities of the zip will be imported inside the specified folder`],
-    [`${command} jsreportExport.zip --validation`, `Execute an import validation of the zip file into the local instance, the import won't be done`]
+    [`${command} jsreportExport.zip --targetFolder=folderShortid`, `Execute an import into a target folder, the entities of the export file will be imported inside the specified folder`],
+    [`${command} jsreportExport.zip --validation`, `Execute an import validation of the export file into the local instance, the import won't be done`]
   ]
 }

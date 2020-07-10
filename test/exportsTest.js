@@ -82,13 +82,13 @@ describe('rest api', () => {
     return request(reporter.express.app)
       .post('/api/import')
       .attach('wrong.zip', path.join(__dirname, 'exportsTest.js'))
-      .expect(500, /import\.zip/)
+      .expect(500, /Unable to read export file/)
   })
 
   it('should return meaningfull message when there is no multipart part', () => {
     return request(reporter.express.app)
       .post('/api/import')
-      .expect(500, /import\.zip/)
+      .expect(500, /Unable to read export file/)
   })
 })
 

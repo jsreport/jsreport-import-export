@@ -839,7 +839,7 @@ var ImportModal = function (_Component2) {
           'div',
           { className: 'form-group' },
           _react2.default.createElement(_FileInput2.default, {
-            placeholder: 'select import zip file...',
+            placeholder: 'select export file to import...',
             selectedFile: this.state.selectedFile,
             onFileSelect: function onFileSelect(file) {
               return _this5.setState({ selectedFile: file });
@@ -958,13 +958,13 @@ var ImportModal = function (_Component2) {
                 _react2.default.createElement(
                   'b',
                   null,
-                  'all the entities that are not present in the zip will be deleted'
+                  'all the entities that are not present in the export file will be deleted'
                 ),
                 ', after the import ',
                 _react2.default.createElement(
                   'b',
                   null,
-                  'you will have only the entities that were present in the zip'
+                  'you will have only the entities that were present in the export file'
                 ),
                 '.'
               )

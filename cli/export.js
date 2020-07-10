@@ -3,7 +3,7 @@ const urlModule = require('url')
 const doRequest = require('./doRequest')
 const normalizePath = require('./normalizePath')
 
-const description = 'Export the entities of the specified jsreport instance into a zip'
+const description = 'Export the entities of the specified jsreport instance into an export file'
 const command = 'export'
 
 exports.command = command
@@ -398,10 +398,10 @@ function getUsage (command) {
 
 function getExamples (command) {
   return [
-    [`${command} jsreportExport.zip`, `Export all the entities of the local instance into a zip file`],
-    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com`, `Export all the entities of the jsreport instance at http://jsreport-host.com into a zip file`],
-    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com --user admin --password xxxx`, `Export all the entities of the authenticated jsreport instance at http://jsreport-host.com into a zip file`],
-    [`${command} jsreportExport.zip --entities entity1Id --entities entity2Id`, `Export just the selected entities of the local instance into a zip file`],
-    [`${command} jsreportExport.zip --entitiesPath entities.json`, `Export just the selected entities (specified in a json file) of the local instance into a zip file`]
+    [`${command} jsreportExport.zip`, `Export all the entities of the local instance into an export file`],
+    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com`, `Export all the entities of the jsreport instance at http://jsreport-host.com into an export file`],
+    [`${command} jsreportExport.zip --serverUrl=http://jsreport-host.com --user admin --password xxxx`, `Export all the entities of the authenticated jsreport instance at http://jsreport-host.com into an export file`],
+    [`${command} jsreportExport.zip --entities entity1Id --entities entity2Id`, `Export just the selected entities of the local instance into an export file`],
+    [`${command} jsreportExport.zip --entitiesPath entities.json`, `Export just the selected entities (specified in a json file) of the local instance into an export file`]
   ]
 }

@@ -185,7 +185,7 @@ describe('cli import/export', () => {
 
       const { stdout } = await exec(dirname, 'import -h')
 
-      should(stdout).containEql('Import a zip with entities in the specified')
+      should(stdout).containEql('Import an export file with entities in the specified')
       should(stdout).containEql('Usage')
       should(stdout).containEql('Positionals')
       should(stdout).containEql('Command options')
