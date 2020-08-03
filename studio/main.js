@@ -312,15 +312,8 @@ var ExportModal = function (_Component) {
       });
     });
 
-    _this.initialSelected = selections;
-
-    _this.selected = Object.keys(selections).reduce(function (acu, key) {
-      if (selections[key] === true) {
-        acu.push(key);
-      }
-
-      return acu;
-    }, []);
+    _this.state = {};
+    _this.state.selected = selections;
 
     _this.handleSelectionChange = _this.handleSelectionChange.bind(_this);
     return _this;
@@ -343,6 +336,8 @@ var ExportModal = function (_Component) {
     key: 'download',
     value: function () {
       var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
+        var _this2 = this;
+
         var response;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
@@ -352,7 +347,9 @@ var ExportModal = function (_Component) {
                 _context.next = 3;
                 return _jsreportStudio2.default.api.post('api/export', {
                   data: {
-                    selection: this.selected
+                    selection: Object.keys(this.state.selected).filter(function (k) {
+                      return _this2.state.selected[k] === true;
+                    })
                   },
                   responseType: 'blob'
                 }, true);
@@ -388,14 +385,18 @@ var ExportModal = function (_Component) {
   }, {
     key: 'handleSelectionChange',
     value: function handleSelectionChange(selected) {
-      this.selected = selected;
+      this.setState({
+        selected: selected
+      });
     }
   }, {
     key: 'render',
     value: function render() {
-      var _this2 = this;
+      var _this3 = this;
 
       var references = this.getExportableReferences(_jsreportStudio2.default.getReferences());
+      var selected = this.state.selected;
+
 
       return _react2.default.createElement(
         'div',
@@ -416,7 +417,7 @@ var ExportModal = function (_Component) {
           _react2.default.createElement(_jsreportStudio.EntityTree, {
             entities: references,
             selectable: true,
-            initialSelected: this.initialSelected,
+            selected: selected,
             onSelectionChanged: this.handleSelectionChange
           })
         ),
@@ -426,7 +427,7 @@ var ExportModal = function (_Component) {
           _react2.default.createElement(
             'a',
             { className: 'button confirmation', onClick: function onClick() {
-                return _this2.download();
+                return _this3.download();
               } },
             'Download'
           )

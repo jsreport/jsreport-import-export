@@ -30,15 +30,8 @@ export default class ExportModal extends Component {
       })
     })
 
-    this.initialSelected = selections
-
-    this.selected = Object.keys(selections).reduce((acu, key) => {
-      if (selections[key] === true) {
-        acu.push(key)
-      }
-
-      return acu
-    }, [])
+    this.state = {}
+    this.state.selected = selections
 
     this.handleSelectionChange = this.handleSelectionChange.bind(this)
   }
@@ -59,7 +52,7 @@ export default class ExportModal extends Component {
     try {
       let response = await Studio.api.post('api/export', {
         data: {
-          selection: this.selected
+          selection: Object.keys(this.state.selected).filter((k) => this.state.selected[k] === true)
         },
         responseType: 'blob'
       }, true)
@@ -71,11 +64,14 @@ export default class ExportModal extends Component {
   }
 
   handleSelectionChange (selected) {
-    this.selected = selected
+    this.setState({
+      selected
+    })
   }
 
   render () {
     const references = this.getExportableReferences(Studio.getReferences())
+    const { selected } = this.state
 
     return (
       <div className='form-group'>
@@ -86,7 +82,7 @@ export default class ExportModal extends Component {
           <EntityTree
             entities={references}
             selectable
-            initialSelected={this.initialSelected}
+            selected={selected}
             onSelectionChanged={this.handleSelectionChange}
           />
         </div>
