@@ -271,8 +271,6 @@ var _filesaver2 = _interopRequireDefault(_filesaver);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -284,42 +282,51 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 var ExportModal = function (_Component) {
   _inherits(ExportModal, _Component);
 
-  function ExportModal() {
+  function ExportModal(props) {
     _classCallCheck(this, ExportModal);
 
-    return _possibleConstructorReturn(this, (ExportModal.__proto__ || Object.getPrototypeOf(ExportModal)).apply(this, arguments));
+    var _this = _possibleConstructorReturn(this, (ExportModal.__proto__ || Object.getPrototypeOf(ExportModal)).call(this, props));
+
+    var options = props.options;
+
+
+    var selections = {};
+
+    var references = _this.getExportableReferences(_jsreportStudio2.default.getReferences());
+
+    Object.keys(references).forEach(function (k) {
+      Object.keys(references[k]).forEach(function (e) {
+        if (options.initialSelected != null) {
+          var selected = Array.isArray(options.initialSelected) ? options.initialSelected : [options.initialSelected];
+
+          selected.forEach(function (s) {
+            if (references[k][e]._id === s) {
+              selections[references[k][e]._id] = true;
+            } else if (selections[references[k][e]._id] == null) {
+              selections[references[k][e]._id] = false;
+            }
+          });
+        } else {
+          selections[references[k][e]._id] = true;
+        }
+      });
+    });
+
+    _this.initialSelected = selections;
+
+    _this.selected = Object.keys(selections).reduce(function (acu, key) {
+      if (selections[key] === true) {
+        acu.push(key);
+      }
+
+      return acu;
+    }, []);
+
+    _this.handleSelectionChange = _this.handleSelectionChange.bind(_this);
+    return _this;
   }
 
   _createClass(ExportModal, [{
-    key: 'componentWillMount',
-    value: function componentWillMount() {
-      var options = this.props.options;
-
-      var selections = {};
-
-      var references = this.getExportableReferences(_jsreportStudio2.default.getReferences());
-
-      Object.keys(references).forEach(function (k) {
-        Object.keys(references[k]).forEach(function (e) {
-          if (options.initialSelected != null) {
-            var selected = Array.isArray(options.initialSelected) ? options.initialSelected : [options.initialSelected];
-
-            selected.forEach(function (s) {
-              if (references[k][e]._id === s) {
-                selections[references[k][e]._id] = true;
-              } else if (selections[references[k][e]._id] == null) {
-                selections[references[k][e]._id] = false;
-              }
-            });
-          } else {
-            selections[references[k][e]._id] = true;
-          }
-        });
-      });
-
-      this.setState(selections);
-    }
-  }, {
     key: 'getExportableReferences',
     value: function getExportableReferences(references) {
       var exportableEntitySets = _jsreportStudio2.default.extensions['import-export'].options.exportableEntitySets;
@@ -333,28 +340,9 @@ var ExportModal = function (_Component) {
       }, {});
     }
   }, {
-    key: 'handleNodeSelect',
-    value: function handleNodeSelect(references, es, v) {
-      var updates = {};
-
-      if (Array.isArray(es)) {
-        es.forEach(function (_id) {
-          updates[_id] = v;
-        });
-      } else {
-        references[es].forEach(function (e) {
-          updates[e._id] = v;
-        });
-      }
-
-      this.setState(updates);
-    }
-  }, {
     key: 'download',
     value: function () {
       var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee() {
-        var _this2 = this;
-
         var response;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
@@ -364,9 +352,7 @@ var ExportModal = function (_Component) {
                 _context.next = 3;
                 return _jsreportStudio2.default.api.post('api/export', {
                   data: {
-                    selection: Object.keys(this.state).filter(function (k) {
-                      return _this2.state[k];
-                    })
+                    selection: this.selected
                   },
                   responseType: 'blob'
                 }, true);
@@ -400,17 +386,16 @@ var ExportModal = function (_Component) {
       return download;
     }()
   }, {
+    key: 'handleSelectionChange',
+    value: function handleSelectionChange(selected) {
+      this.selected = selected;
+    }
+  }, {
     key: 'render',
     value: function render() {
-      var _this3 = this;
+      var _this2 = this;
 
       var references = this.getExportableReferences(_jsreportStudio2.default.getReferences());
-
-      Object.keys(references).forEach(function (k) {
-        Object.keys(references[k]).forEach(function (e) {
-          return references[k][e] = Object.assign({}, references[k][e], { __selected: _this3.state[references[k][e]._id] });
-        });
-      });
 
       return _react2.default.createElement(
         'div',
@@ -429,15 +414,10 @@ var ExportModal = function (_Component) {
           'div',
           { style: { height: '30rem', overflow: 'auto' } },
           _react2.default.createElement(_jsreportStudio.EntityTree, {
-            activeEntity: _jsreportStudio2.default.getActiveEntity(),
             entities: references,
             selectable: true,
-            onNodeSelect: function onNodeSelect(es, v) {
-              return _this3.handleNodeSelect(references, es, v);
-            },
-            onSelect: function onSelect(e, v) {
-              return _this3.setState(_defineProperty({}, e._id, !_this3.state[e._id]));
-            }
+            initialSelected: this.initialSelected,
+            onSelectionChanged: this.handleSelectionChange
           })
         ),
         _react2.default.createElement(
@@ -446,7 +426,7 @@ var ExportModal = function (_Component) {
           _react2.default.createElement(
             'a',
             { className: 'button confirmation', onClick: function onClick() {
-                return _this3.download();
+                return _this2.download();
               } },
             'Download'
           )

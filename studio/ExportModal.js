@@ -3,9 +3,12 @@ import Studio, { EntityTree } from 'jsreport-studio'
 import fileSaver from 'filesaver.js-npm'
 
 export default class ExportModal extends Component {
-  componentWillMount () {
-    const { options } = this.props
-    let selections = {}
+  constructor (props) {
+    super(props)
+
+    const { options } = props
+
+    const selections = {}
 
     const references = this.getExportableReferences(Studio.getReferences())
 
@@ -27,7 +30,17 @@ export default class ExportModal extends Component {
       })
     })
 
-    this.setState(selections)
+    this.initialSelected = selections
+
+    this.selected = Object.keys(selections).reduce((acu, key) => {
+      if (selections[key] === true) {
+        acu.push(key)
+      }
+
+      return acu
+    }, [])
+
+    this.handleSelectionChange = this.handleSelectionChange.bind(this)
   }
 
   getExportableReferences (references) {
@@ -42,27 +55,11 @@ export default class ExportModal extends Component {
     }, {})
   }
 
-  handleNodeSelect (references, es, v) {
-    let updates = {}
-
-    if (Array.isArray(es)) {
-      es.forEach((_id) => {
-        updates[_id] = v
-      })
-    } else {
-      references[es].forEach((e) => {
-        updates[e._id] = v
-      })
-    }
-
-    this.setState(updates)
-  }
-
   async download () {
     try {
       let response = await Studio.api.post('api/export', {
         data: {
-          selection: Object.keys(this.state).filter((k) => this.state[k])
+          selection: this.selected
         },
         responseType: 'blob'
       }, true)
@@ -73,12 +70,12 @@ export default class ExportModal extends Component {
     }
   }
 
+  handleSelectionChange (selected) {
+    this.selected = selected
+  }
+
   render () {
     const references = this.getExportableReferences(Studio.getReferences())
-
-    Object.keys(references).forEach((k) => {
-      Object.keys(references[k]).forEach((e) => (references[k][e] = Object.assign({}, references[k][e], { __selected: this.state[references[k][e]._id] })))
-    })
 
     return (
       <div className='form-group'>
@@ -87,11 +84,10 @@ export default class ExportModal extends Component {
         </div>
         <div style={{height: '30rem', overflow: 'auto'}}>
           <EntityTree
-            activeEntity={Studio.getActiveEntity()}
             entities={references}
             selectable
-            onNodeSelect={(es, v) => this.handleNodeSelect(references, es, v)}
-            onSelect={(e, v) => this.setState({ [e._id]: !this.state[e._id] })}
+            initialSelected={this.initialSelected}
+            onSelectionChanged={this.handleSelectionChange}
           />
         </div>
         <div className='button-bar'>
