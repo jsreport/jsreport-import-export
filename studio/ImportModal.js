@@ -92,11 +92,16 @@ class ImportModal extends Component {
     })
 
     try {
+      const params = {
+        fullImport: this.state.fullImport
+      }
+
+      if (this.state.selectedFolderShortid != null) {
+        params.targetFolder = this.state.selectedFolderShortid
+      }
+
       const result = await Studio.api.post('api/validate-import', {
-        params: {
-          fullImport: this.state.fullImport,
-          targetFolder: this.state.selectedFolderShortid
-        },
+        params,
         attach: { filename: 'import.zip', file }
       }, true)
 
@@ -130,12 +135,17 @@ class ImportModal extends Component {
         log: 'Working on import....'
       })
 
+      const params = {
+        fullImport: this.state.fullImport,
+        continueOnFail: retryWithContinueOnFail
+      }
+
+      if (this.state.selectedFolderShortid != null) {
+        params.targetFolder = this.state.selectedFolderShortid
+      }
+
       const result = await Studio.api.post('api/import', {
-        params: {
-          fullImport: this.state.fullImport,
-          continueOnFail: retryWithContinueOnFail,
-          targetFolder: this.state.selectedFolderShortid
-        },
+        params,
         attach: { filename: 'import.zip', file: this.state.selectedFile }
       }, true)
 

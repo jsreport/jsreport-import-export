@@ -620,7 +620,7 @@ var ImportModal = function (_Component2) {
     key: 'validate',
     value: function () {
       var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(file) {
-        var result;
+        var params, result;
         return regeneratorRuntime.wrap(function _callee$(_context) {
           while (1) {
             switch (_context.prev = _context.next) {
@@ -641,16 +641,22 @@ var ImportModal = function (_Component2) {
                 });
 
                 _context.prev = 3;
-                _context.next = 6;
+                params = {
+                  fullImport: this.state.fullImport
+                };
+
+
+                if (this.state.selectedFolderShortid != null) {
+                  params.targetFolder = this.state.selectedFolderShortid;
+                }
+
+                _context.next = 8;
                 return _jsreportStudio2.default.api.post('api/validate-import', {
-                  params: {
-                    fullImport: this.state.fullImport,
-                    targetFolder: this.state.selectedFolderShortid
-                  },
+                  params: params,
                   attach: { filename: 'import.zip', file: file }
                 }, true);
 
-              case 6:
+              case 8:
                 result = _context.sent;
 
 
@@ -660,11 +666,11 @@ var ImportModal = function (_Component2) {
                   processing: false,
                   log: result.log
                 });
-                _context.next = 13;
+                _context.next = 15;
                 break;
 
-              case 10:
-                _context.prev = 10;
+              case 12:
+                _context.prev = 12;
                 _context.t0 = _context['catch'](3);
 
                 this.setState({
@@ -674,12 +680,12 @@ var ImportModal = function (_Component2) {
                   log: _context.t0.message + ' ' + _context.t0.stack
                 });
 
-              case 13:
+              case 15:
               case 'end':
                 return _context.stop();
             }
           }
-        }, _callee, this, [[3, 10]]);
+        }, _callee, this, [[3, 12]]);
       }));
 
       function validate(_x) {
@@ -692,7 +698,7 @@ var ImportModal = function (_Component2) {
     key: 'import',
     value: function () {
       var _ref2 = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee2() {
-        var retryWithContinueOnFail, result, stateToUpdate;
+        var retryWithContinueOnFail, params, result, stateToUpdate;
         return regeneratorRuntime.wrap(function _callee2$(_context2) {
           while (1) {
             switch (_context2.prev = _context2.next) {
@@ -714,17 +720,23 @@ var ImportModal = function (_Component2) {
                   log: 'Working on import....'
                 });
 
-                _context2.next = 7;
+                params = {
+                  fullImport: this.state.fullImport,
+                  continueOnFail: retryWithContinueOnFail
+                };
+
+
+                if (this.state.selectedFolderShortid != null) {
+                  params.targetFolder = this.state.selectedFolderShortid;
+                }
+
+                _context2.next = 9;
                 return _jsreportStudio2.default.api.post('api/import', {
-                  params: {
-                    fullImport: this.state.fullImport,
-                    continueOnFail: retryWithContinueOnFail,
-                    targetFolder: this.state.selectedFolderShortid
-                  },
+                  params: params,
                   attach: { filename: 'import.zip', file: this.state.selectedFile }
                 }, true);
 
-              case 7:
+              case 9:
                 result = _context2.sent;
 
 
@@ -736,11 +748,11 @@ var ImportModal = function (_Component2) {
                 _jsreportStudio2.default.openModal(ImportFinishedModal, {
                   log: result.log
                 });
-                _context2.next = 17;
+                _context2.next = 19;
                 break;
 
-              case 12:
-                _context2.prev = 12;
+              case 14:
+                _context2.prev = 14;
                 _context2.t0 = _context2['catch'](3);
                 stateToUpdate = {
                   status: '1',
@@ -757,12 +769,12 @@ var ImportModal = function (_Component2) {
 
                 this.setState(stateToUpdate);
 
-              case 17:
+              case 19:
               case 'end':
                 return _context2.stop();
             }
           }
-        }, _callee2, this, [[3, 12]]);
+        }, _callee2, this, [[3, 14]]);
       }));
 
       function _import() {
