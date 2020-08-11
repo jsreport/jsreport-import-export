@@ -5,11 +5,13 @@ class FileInput extends Component {
   constructor (props) {
     super(props)
 
+    this.inputFileRef = React.createRef()
+
     this.state = {}
   }
 
   handleOpen () {
-    this.refs.file.dispatchEvent(new MouseEvent('click', {
+    this.inputFileRef.current.dispatchEvent(new MouseEvent('click', {
       'view': window,
       'bubbles': false,
       'cancelable': true
@@ -50,7 +52,7 @@ class FileInput extends Component {
         <input
           type='file'
           key='file'
-          ref='file'
+          ref={this.inputFileRef}
           style={{ display: 'none' }}
           onChange={(e) => {
             if (!e.target.files.length) {

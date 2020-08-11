@@ -1063,6 +1063,8 @@ var FileInput = function (_Component) {
 
     var _this = _possibleConstructorReturn(this, (FileInput.__proto__ || Object.getPrototypeOf(FileInput)).call(this, props));
 
+    _this.inputFileRef = _react2.default.createRef();
+
     _this.state = {};
     return _this;
   }
@@ -1070,7 +1072,7 @@ var FileInput = function (_Component) {
   _createClass(FileInput, [{
     key: 'handleOpen',
     value: function handleOpen() {
-      this.refs.file.dispatchEvent(new MouseEvent('click', {
+      this.inputFileRef.current.dispatchEvent(new MouseEvent('click', {
         'view': window,
         'bubbles': false,
         'cancelable': true
@@ -1124,7 +1126,7 @@ var FileInput = function (_Component) {
         _react2.default.createElement('input', {
           type: 'file',
           key: 'file',
-          ref: 'file',
+          ref: this.inputFileRef,
           style: { display: 'none' },
           onChange: function onChange(e) {
             if (!e.target.files.length) {
