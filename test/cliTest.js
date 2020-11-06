@@ -235,6 +235,39 @@ describe('cli import/export', () => {
       commonImport(dirName, dirName)
     })
 
+    describe('local instance authenticated', () => {
+      const dirName = 'import-local-authenticated'
+
+      beforeEach(async () => {
+        const fullDir = getTempDir(dirName)
+
+        await setup(dirName, ['jsreport-authentication', 'jsreport-authorization'], null, {
+          extensions: {
+            authentication: {
+              cookieSession: {
+                secret: 'secret string'
+              },
+              admin: {
+                username: 'admin',
+                password: 'password'
+              },
+              enabled: true
+            }
+          }
+        })
+
+        fs.copyFileSync(path.join(__dirname, 'export-test.zip'), path.join(fullDir, 'export.zip'))
+
+        const reporter = await init(dirName)
+        await reporter.documentStore.collection('templates').insert({ name: 'xxx', engine: 'none', recipe: 'html' })
+        await reporter.close()
+      })
+
+      it('should be able to do full import', async () => {
+        await exec(dirName, 'import --fullImport export.zip')
+      })
+    })
+
     describe('remote instance', () => {
       const dirName = 'import-remote-cli'
       const remoteDirName = 'import-remote-instance'

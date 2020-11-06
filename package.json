@@ -51,6 +51,7 @@
     "in-publish": "2.0.1",
     "jsreport-assets": "1.7.0",
     "jsreport-authentication": "2.6.0",
+    "jsreport-authorization": "2.4.0",
     "jsreport-cli": "2.2.5",
     "jsreport-core": "2.10.0",
     "jsreport-data": "2.4.0",
